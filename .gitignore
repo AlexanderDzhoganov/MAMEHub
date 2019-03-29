@@ -42,9 +42,15 @@ Sources/Emulator/csume.sym
 Sources/Emulator/csume64.sym
 
 # Build objects
-Sources/Emulator/obj
+obj
 
 # Eclipse Project Files
 .settings
 .project
 .classpath
+
+.vscode
+
+mametiny*
+mamecps1*
+*.bc

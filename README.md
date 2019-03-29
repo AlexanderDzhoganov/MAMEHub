@@ -1,52 +1,39 @@
-MAMEHub
-=======
+What is MAME?
+=============
 
-MAMEHub: A free gaming platform that brings people from different ends of the earth together to experience both arcade and console games online
+MAME stands for Multiple Arcade Machine Emulator.
 
-Imagine walking into the biggest arcade you've ever seen in your life.  There are thousands of arcade cabinets with all of your favorite past-time games, and even rooms full of consoles, including super nintendo, genesis, and even playstation.  Just like a real arcade, you can call your friends and invite them to come and play games, but in this arcade your friends don't have to meet you in the arcade, they don't even have to be on the same continent.
+MAME's purpose is to preserve decades of video-game history. As gaming technology continues to rush forward, MAME prevents these important "vintage" games from being lost and forgotten. This is achieved by documenting the hardware and how it functions. The source code to MAME serves as this documentation. The fact that the games are playable serves primarily to validate the accuracy of the documentation (how else can you prove that you have recreated the hardware faithfully?).
 
-MAMEHub is the world's biggest arcade & living room in one: a massive library of games sitting on a scalable, peer-to-peer platform that can bring people from different ends of the earth together to experience both arcade and console games online.
+What is MESS?
+=============
 
-When it comes to code, MAMEHub is two things:  A fork of MAME & MESS that supports Netplay (coming to github soon), and a client/server interface that allows players from around the word to meet and play games (server coming soon).
+MESS (Multi Emulator Super System) is the sister project of MAME. MESS documents the hardware for a wide variety of (mostly vintage) computers, video game consoles, and calculators, as MAME does for arcade games.
 
-Building the MAMEHub Emulator
------------------------------
-The MAMEHub Emulator is a fork of MAME that adds a fully-connected peer-to-peer networking layer.  Building MAMEHub should be the same as building MAME, but for completeness, here are some instructions on a per-OS basis.
+The MESS and MAME projects live in the same source repository and share much of the same code, but are different build targets.
 
-### Mac OS/X
+How to compile?
+=============
 
-1. Download SDL from http://libsdl.org/
-2. Open terminal, go to the SDL directory
-3. run ./configure --prefix=SDL_INSTALL_DIRECTORY  (replace with an empty directory name)
-4. run make install
-5. Download and install yasm from http://yasm.tortall.net/
-6. In the same terminal, go to the MAMEHub/Emulator directory
-7. run export PATH=SDL_INSTALL_DIRECTORY/bin:$PATH
-8. run export MACOSX_DEPLOYMENT_TARGET=10.5
-9. run make -j8 MACOSX_USE_LIBSDL=1 PTR64=1 NOWERROR=1 TARGET=ume PROFILER=1 SYMBOLS=1 OPTIMIZE=3 CC=/usr/bin/clang LD=/usr/bin/clang++ AR=/usr/bin/ar
-10. You should now have a csume64 file which is the emulator binary.
+If you're on a *nix system, it could be as easy as typing
 
-### Linux
+```
+make
+```
 
-1. Install sdl and yasm using a package manager
-2. Open a terminal and go to the MAMEHub/Emulator directory
-3. run make -j8 NOWERROR=1 TARGET=ume
-4. You should now have a csume or csume64 file which is the emulator binary.
+for a MAME build, or
 
-### Windows
+```
+make TARGET=mess
+```
 
-1. Download the mamedev tools from http://www.mamedev.org/tools/
-2. Download yasm from http://yasm.tortall.net/ .  Rename yasm to "yasm.exe" and put in your path.
-2. Follow the instructions on that page up to the make command
-3. Replace make command with make -j8 NOWERROR=1 TARGET=ume
-4. You should now have a csume.exe which is the emulator binary
+for a MESS build (provided you have all the [prerequisites](http://forums.bannister.org/ubbthreads.php?ubb=showflat&Number=35138)).
 
-Building the MAMEHub Client
----------------------------
-The MAMEHub Client uses [Gradle](https://www.gradle.org/).  To build the client, first install [Thrift](https://thrift.apache.org/docs/install/), then go to the Client/ directory and run this command in the client directory:
+For Windows users, we provide a ready-made [build environment](http://mamedev.org/tools/) based on MinGW-w64. [Visual Studio builds](http://wiki.mamedev.org/index.php?title=Building_MAME_using_Microsoft_Visual_Studio_compilers) are also possible.
 
-    gradle solid
+Where can I find out more?
+=============
 
-Maven will automatically download the dependencies and build MAMEHub.  Then to run your client, run this command:
-
-    java -jar solid/MAMEHubClient-0.0.1-SNAPSHOT.jar
+* [Official MAME Development Team Site](http://mamedev.org/) (includes binary downloads for MAME and MESS, wiki, forums, and more)
+* [Official MESS Wiki](http://www.mess.org/)
+* [MAME Testers](http://mametesters.org/) (official bug tracker for MAME and MESS)
