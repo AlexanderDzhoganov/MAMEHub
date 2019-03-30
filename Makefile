@@ -9,12 +9,21 @@
 #
 ###########################################################################
 
-
-
 ###########################################################################
 #################   BEGIN USER-CONFIGURABLE OPTIONS   #####################
 ###########################################################################
 
+TARGET=mame
+TARGETOS=emscripten
+NOWERROR=1
+CC=emcc
+AR=emar
+LD=emcc
+SUBTARGET=cps1
+DONT_USE_NETWORK=1
+NO_USE_QTDEBUG=1
+NO_USE_MIDI=1
+NO_X11=1
 
 #-------------------------------------------------
 # specify core target: mame, mess, etc.
@@ -30,8 +39,6 @@ endif
 ifndef SUBTARGET
 SUBTARGET = $(TARGET)
 endif
-
-
 
 #-------------------------------------------------
 # specify OSD layer: windows, sdl, etc.
@@ -508,7 +515,7 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 # we compile C-only to C89 standard with GNU extensions
 # we compile C++ code to C++98 standard with GNU extensions
 
-EMFLAGS=-s USE_PTHREADS=1 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -Wfatal-errors
+EMFLAGS=-s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -Wfatal-errors
 
 CONLYFLAGS += $(EMFLAGS)
 ifdef CPP11
@@ -777,9 +784,6 @@ endif
 # add protobuf library
 PROTOBUF = $(OBJ)/libprotobuf.bc
 
-# add RakNet library
-RAKNET = $(OBJ)/libraknet.bc
-
 #-------------------------------------------------
 # 'default' target needs to go here, before the
 # include files which define additional targets
@@ -802,7 +806,6 @@ BUILDOUT = $(BUILDOBJ)
 ifdef NATIVE_OBJ
 BUILDOUT = $(NATIVE_OBJ)/build
 endif # NATIVE_OBJ
-
 
 #-------------------------------------------------
 # include the various .mak files
@@ -888,8 +891,6 @@ mak: maketree $(MAKEMAK_TARGET)
 $(sort $(OBJDIRS)):
 	$(MD) -p $@
 
-
-
 #-------------------------------------------------
 # executable targets and dependencies
 #-------------------------------------------------
@@ -900,7 +901,7 @@ ifeq ($(BUSES),)
 LIBBUS =
 endif
 
-EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(RAKNET) $(SOFTFLOAT) $(JPEG_LIB) $(FLAC_LIB) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(LUA_LIB) $(SQLITE3_LIB) $(WEB_LIB) $(BGFX_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
+EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(SOFTFLOAT) $(JPEG_LIB) $(FLAC_LIB) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(LUA_LIB) $(SQLITE3_LIB) $(WEB_LIB) $(BGFX_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
 
 ifeq ($(TARGETOS),emscripten)
 EMULATOROBJ = $(EMULATOROBJLIST:.a=.bc)

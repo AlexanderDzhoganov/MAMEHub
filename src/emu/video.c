@@ -8,8 +8,8 @@
 
 ***************************************************************************/
 
-#include "NSM_Server.h"
-#include "NSM_Client.h"
+#include "nsm_server.h"
+#include "nsm_client.h"
 #include "emu.h"
 #include "emuopts.h"
 #include "png.h"

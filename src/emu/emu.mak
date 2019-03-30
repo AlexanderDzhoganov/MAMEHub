@@ -50,10 +50,11 @@ OBJDIRS += \
 #-------------------------------------------------
 
 EMUOBJS = \
-	$(EMUOBJ)/NSM_Common.o \
-	$(EMUOBJ)/NSM_Server.o \
-	$(EMUOBJ)/NSM_Client.o \
+	$(EMUOBJ)/nsm_common.o \
+	$(EMUOBJ)/nsm_server.o \
+	$(EMUOBJ)/nsm_client.o \
 	$(EMUOBJ)/nsm.pb.o \
+	$(EMUOBJ)/raknet_shim.o \
 	$(EMUOBJ)/hashfile.o \
 	$(EMUOBJ)/addrmap.o \
 	$(EMUOBJ)/attotime.o \

@@ -9,7 +9,7 @@
 
 *********************************************************************/
 
-#include "NSM_Common.h"
+#include "nsm_common.h"
 
 #include "emu.h"
 #include "emuopts.h"

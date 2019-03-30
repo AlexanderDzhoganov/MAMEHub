@@ -205,6 +205,7 @@ public:
 	// immediate operations
   void processNetworkBuffer(nsm::PeerInputData *inputData,int peerID);
 	int run(bool firstrun);
+	void mainLoop();
 	void pause();
 	void resume();
 	void toggle_pause();

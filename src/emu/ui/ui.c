@@ -9,8 +9,8 @@
 
 *********************************************************************/
 
-#include "NSM_Client.h"
-#include "NSM_Server.h"
+#include "nsm_client.h"
+#include "nsm_server.h"
 
 #include "emu.h"
 #include "emuopts.h"
@@ -512,8 +512,8 @@ void ui_manager::update_and_render(render_container *container)
                     continue;
                 allLatencyString += netCommon->getLatencyString(netCommon->getPeerID(a)) + string("\n");
             }
-            draw_text_box(container,allLatencyString.c_str(),JUSTIFY_CENTER,0.9f,0.1f,rgb_t(255,0,0,128));
-            draw_text_box(container,netCommon->getStatisticsString().c_str(),JUSTIFY_CENTER,0.1f,0.1f,rgb_t(255,0,0,128));
+            // draw_text_box(container,allLatencyString.c_str(),JUSTIFY_CENTER,0.9f,0.1f,rgb_t(255,0,0,128));
+            // draw_text_box(container,netCommon->getStatisticsString().c_str(),JUSTIFY_CENTER,0.1f,0.1f,rgb_t(255,0,0,128));
         }
 	}
 

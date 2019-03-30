@@ -90,9 +90,9 @@
 
 ***************************************************************************/
 
-#include "NSM_Common.h"
-#include "NSM_Server.h"
-#include "NSM_Client.h"
+#include "nsm_common.h"
+#include "nsm_server.h"
+#include "nsm_client.h"
 
 #include "nsm.pb.h"
 
@@ -3130,7 +3130,6 @@ g_profiler.start(PROFILER_INPUT);
       // store local inputs in buffer for broadcast
       nsm::InputPort *inputPort = inputState.add_ports();
       store_local_port(*port, inputPort);
-
     }
   }
 
@@ -3147,7 +3146,7 @@ g_profiler.start(PROFILER_INPUT);
   }
 
   attotime curMachineTime = machine().machine_time();
-  //cout << "AT TIME " << curMachineTime.seconds << "." << curMachineTime.attoseconds << endl;
+  // cout << "AT TIME " << curMachineTime.as_double() << endl;
 
   //cout << "MOST RECENT SENT REPORT " << mostRecentSentReport.seconds << "." << mostRecentSentReport.attoseconds << endl;
   if(netCommon) {
@@ -3159,7 +3158,9 @@ g_profiler.start(PROFILER_INPUT);
     if (!rollback) {
       attosecondsToLead = ATTOSECONDS_PER_MILLISECOND*delayFromPing;
     }
+
     attotime futureInputTime = curMachineTime + attotime(0,attosecondsToLead);
+
     if (futureInputTime < inputStartTime) {
       // Inputs before the input start time are not valid.
     } else if(futureInputTime <= mostRecentSentReport) {

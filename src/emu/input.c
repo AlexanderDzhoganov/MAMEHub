@@ -1068,7 +1068,7 @@ INT32 input_manager::code_value(input_code code)
 {
 	g_profiler.start(PROFILER_INPUT);
 	INT32 result = 0;
-
+	
 	// dummy loop to allow clean early exits
 	do
 	{

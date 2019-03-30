@@ -22,15 +22,13 @@
 
 ***************************************************************************/
 
-#include "NSM_Common.h"
-#include "NSM_Server.h"
-#include "NSM_Client.h"
-
-
-#include "emu.h"
-
 #include <zlib.h>
 
+#include "nsm_common.h"
+#include "nsm_server.h"
+#include "nsm_client.h"
+
+#include "emu.h"
 
 //**************************************************************************
 //  DEBUGGING

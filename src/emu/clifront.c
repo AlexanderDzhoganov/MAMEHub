@@ -8,7 +8,7 @@
 
 ***************************************************************************/
 
-#include "RakNet/GetTime.h"
+#include "raknet_shim.h"
 
 #include "emu.h"
 #include "chd.h"
