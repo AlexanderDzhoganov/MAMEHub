@@ -115,9 +115,6 @@ int cli_frontend::execute(int argc, char **argv)
   // Initial rand
   srand(1234);
 
-  // Initialize raknet time.
-  RakNet::GetTime();
-
 	// wrap the core execution in a try/catch to field all fatal errors
 	m_result = MAMERR_NONE;
 	try

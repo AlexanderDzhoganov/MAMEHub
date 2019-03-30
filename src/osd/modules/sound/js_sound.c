@@ -25,7 +25,7 @@ public:
 	}
 	virtual ~sound_js() { }
 
-	virtual int init() { }
+	virtual int init() { return 0; }
 	virtual void exit() { }
 	virtual void pauseAudio(bool pause) { }
 

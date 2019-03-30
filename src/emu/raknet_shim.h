@@ -6,9 +6,7 @@
 #include <string>
 
 /*
- *
  * RakNet library shim, calls into JavaScript
- * 
  */
 
 enum
@@ -49,7 +47,6 @@ namespace RakNet
   };
 
   typedef unsigned int Time;
-  typedef unsigned int TimeUS;
   typedef unsigned int StartupResult;
 
   Time GetTime();

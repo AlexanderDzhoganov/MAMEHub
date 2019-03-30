@@ -720,15 +720,19 @@ bool Server::update(running_machine *machine) {
   return true;
 }
 
-void Server::sync(running_machine *machine) {
+void Server::sync(running_machine *machine)
+{
   cout << "SYNCING (count): " << syncCount << endl;
 
-  // if (syncCount>0) {
-  machine->save().dispatch_presave();
-  //}
+  if (syncCount>0)
+  {
+    machine->save().dispatch_presave();
+  }
 
   if (syncOverride)
+  {
     return;
+  }
 
   syncProto.set_generation(generation);
   nsm::Attotime *global_time = syncProto.mutable_global_time();
@@ -750,50 +754,63 @@ void Server::sync(running_machine *machine) {
   unsigned char xorChecksum = 0;
   unsigned char staleChecksum = 0;
   unsigned char allStaleChecksum = 0;
-  for (int blockIndex = 0; blockIndex < int(blocks.size()); blockIndex++) {
+  for (int blockIndex = 0; blockIndex < int(blocks.size()); blockIndex++)
+  {
     MemoryBlock &block = *(blocks[blockIndex]);
     MemoryBlock &staleBlock = *(staleBlocks[blockIndex]);
     MemoryBlock &initialBlock = *(initialBlocks[blockIndex]);
 
-    if (block.size != staleBlock.size || block.size != initialBlock.size) {
+    if (block.size != staleBlock.size || block.size != initialBlock.size)
+    {
       cout << "BLOCK SIZE MISMATCH: " << blockIndex << ": " << block.size << " "
            << staleBlock.size << " " << initialBlock.size << endl;
-      ;
     }
 
     bool dirty = false;
-    if (syncCount == 0 || memcmp(block.data, staleBlock.data, block.size)) {
+    if (syncCount == 0 || memcmp(block.data, staleBlock.data, block.size))
+    {
       dirty = true;
     }
-    if (dirty) {
-      for (int a = 0; a < block.size; a++) {
+
+    if (dirty)
+    {
+      for (int a = 0; a < block.size; a++)
+      {
         blockChecksum = blockChecksum ^ block.data[a];
         staleChecksum = staleChecksum ^ staleBlock.data[a];
       }
     }
+    
     // dirty=true;
-    if (syncCount == 0) {
+    if (syncCount == 0)
+    {
       memcpy(initialBlock.data, block.data, block.size);
     }
-    if (dirty && !anyDirty) {
+
+    if (dirty && !anyDirty)
+    {
       // First dirty block
       anyDirty = true;
     }
 
-    if (dirty) {
+    if (dirty)
+    {
       bytesSynched += block.size;
       nsm::SyncBlock *syncBlock = syncProto.add_block();
       syncBlock->set_index(blockIndex);
       string *s = syncBlock->mutable_data();
-      for (int a = 0; a < block.size; a++) {
+      for (int a = 0; a < block.size; a++)
+      {
         s->append(1, block.data[a] ^ staleBlock.data[a]);
       }
 
       // Put the current block into stale blocks
       memcpy(staleBlock.data, block.data, block.size);
     }
+
     // cout << "BLOCK " << blockIndex << ": ";
-    for (int a = 0; a < block.size; a++) {
+    for (int a = 0; a < block.size; a++)
+    {
       allStaleChecksum = allStaleChecksum ^ staleBlock.data[a];
     }
     // cout << int(allStaleChecksum) << endl;
@@ -804,23 +821,20 @@ void Server::sync(running_machine *machine) {
   printf("STALE CHECKSUM (dirty): %d\n", int(staleChecksum));
   printf("STALE CHECKSUM (all): %d\n", int(allStaleChecksum));
   // The first sync is not sent to clients
-  if (syncCount > 0 &&
-      syncProcessor.get() == NULL) // FIXME not sure about null check
+  if (syncCount > 0)
   {
     syncProcessor = std::shared_ptr<SyncProcessor>(new SyncProcessor(
         &syncProto, &syncPacketQueue, syncTransferSeconds, &syncReady));
   }
-  // else
-  {
-    // printf("No dirty blocks found\n");
-  }
-  // if(runTimes%1==0) cout << "BYTES SYNCED: " << bytesSynched << endl;
-  // cout << "OUT OF CRITICAL AREA\n";
-  // cout.flush();
 
-  // if (syncCount>0) {
-  machine->save().dispatch_postload();
-  //}
+  // if(runTimes%1==0) cout << "BYTES SYNCED: " << bytesSynched << endl;
+  cout << "OUT OF CRITICAL AREA\n";
+  cout.flush();
+
+  if (syncCount>0)
+  {
+    machine->save().dispatch_postload();
+  }
 
   {
     unsigned char blockChecksum = 0;
@@ -844,7 +858,11 @@ void Server::popSyncQueue() {
   if (!syncReady)
     return;
 
-  syncProcessor->process();
+  if (syncProcessor)
+  {
+    syncProcessor->process();
+  }
+
   long long curRealTime = RakNet::GetTimeMS() - emulationStartTime;
 
   // cout << "SYNC TIMES: " << (curRealTime/100) << " " << (lastSyncQueueMs/100)

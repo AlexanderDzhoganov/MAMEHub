@@ -123,8 +123,7 @@ extern int GetPacketSize(RakNet::Packet *p);
 
 Common::Common(string _username, int _unmeasuredNoise)
     : secondsBetweenSync(0), globalInputCounter(0), selfPeerID(0),
-      generation(1), username(_username), player(0),
-      unmeasuredNoise(_unmeasuredNoise) {
+      generation(1), unmeasuredNoise(_unmeasuredNoise), username(_username), player(0) {
   if (username.length() > 16) {
     username = username.substr(0, 16);
   }
@@ -161,7 +160,7 @@ RakNet::SystemAddress Common::ConnectBlocking(const char *defaultAddress,
   {
     { strcpy(ipAddr, defaultAddress); }
   }
-  if (rakInterface->Connect(ipAddr, defaultPort, "MAME", (int)strlen("MAME")) !=
+  if (rakInterface->Connect(ipAddr, defaultPort, NULL, 0) !=
       RakNet::CONNECTION_ATTEMPT_STARTED) {
     printf("Failed connect call for %s : %d.\n", defaultAddress,
            int(defaultPort));

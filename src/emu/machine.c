@@ -514,7 +514,8 @@ void running_machine::mainLoop()
     m_machine_time += (timeAfter - timeBefore);
     attotime machineTimeAfter = machine_time();
     secondPassed = machineTimeBefore.seconds != machineTimeAfter.seconds;
-    tenthSecondPassed = secondPassed || ((machineTimeBefore.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)) != (machineTimeAfter.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)));
+    tenthSecondPassed = secondPassed ||
+      ((machineTimeBefore.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)) != (machineTimeAfter.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)));
 
     if (netCommon)
     {
@@ -527,12 +528,11 @@ void running_machine::mainLoop()
 
       netCommon->getPeerIDs(peerIDs);
       
-      for (int a=0; a<peerIDs.size(); a++)
+      for (int a = 0; a<peerIDs.size(); a++)
       {
         while(true)
         {
           nsm::PeerInputData input = netCommon->popInput(peerIDs[a]);
-
           if (!input.has_time())
           {
             break;
@@ -544,12 +544,11 @@ void running_machine::mainLoop()
     }
   }
 
+  //printf("EMULATION FINISHED\n");
   static int lastSyncSecond = 0;
-  //printf("EMULATION FINSIHED\n");
+  static int firstTimeAtSecond = 0;
 
-  static int firstTimeAtSecond=0;
-
-  if(m_machine_time.seconds>0 && m_scheduler.can_save() && timePassed && !firstTimeAtSecond)
+  if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed && !firstTimeAtSecond)
   {
     firstTimeAtSecond = 1;
     if (netServer)
@@ -564,7 +563,7 @@ void running_machine::mainLoop()
       netClient->createInitialBlocks(this);
     }
   }
-  else if(m_machine_time.seconds>0 && m_scheduler.can_save() && timePassed)
+  else if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed)
   {
     if(
       netServer &&
@@ -611,7 +610,7 @@ void running_machine::mainLoop()
       }
     }
 
-    static clock_t lastSyncTime=clock();
+    static clock_t lastSyncTime = clock();
     if(netCommon)
     {
       //printf("IN NET LOOP\n");
@@ -652,6 +651,8 @@ void running_machine::mainLoop()
       }
     }
   }
+
+  return;
 
   // handle save/load
   if (timePassed && m_saveload_schedule != SLS_NONE)
@@ -712,180 +713,96 @@ int running_machine::run(bool firstrun)
 
   int error = MAMERR_NONE;
 
-  // use try/catch for deep error recovery
-  try
+  // move to the init phase
+  m_current_phase = MACHINE_PHASE_INIT;
+
+  // if we have a logfile, set up the callback
+  if (options().log())
   {
-    // move to the init phase
-    m_current_phase = MACHINE_PHASE_INIT;
+    m_logfile.reset(global_alloc(emu_file(OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS)));
+    file_error filerr = m_logfile->open("error.log");
+    assert_always(filerr == FILERR_NONE, "unable to open log file");
+    add_logerror_callback(logfile_callback);
+  }
 
-    // if we have a logfile, set up the callback
-    if (options().log())
+  // then finish setting up our local machine
+  start();
+
+  // load the configuration settings and NVRAM
+  bool settingsloaded = config_load_settings(*this);
+
+  if((system().flags & GAME_SUPPORTS_SAVE) == 0)
+  {
+    ui().popup_time(10, "This game does not have complete save state support, desyncs may not be resolved correctly.");
+  }
+
+  //After loading config but before loading nvram, initialize the network
+  if(netServer)
+  {
+    netServer->setSecondsBetweenSync(options().secondsBetweenSync());
+
+    if(!netServer->initializeConnection())
     {
-      m_logfile.reset(global_alloc(emu_file(OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS)));
-      file_error filerr = m_logfile->open("error.log");
-      assert_always(filerr == FILERR_NONE, "unable to open log file");
-      add_logerror_callback(logfile_callback);
+      return MAMERR_NETWORK;
     }
+  }
 
-    // then finish setting up our local machine
-    start();
-
-    // load the configuration settings and NVRAM
-    bool settingsloaded = config_load_settings(*this);
-
-    if((system().flags & GAME_SUPPORTS_SAVE) == 0)
+  if(netClient)
+  {
+    /* specify the filename to save or load */
+    //set_saveload_filename(machine, "1");
+    //handle_load(machine);
+    //if(netClient->getSecondsBetweenSync())
+    //doPreSave(this);
+    bool retval = netClient->initializeConnection(
+      (unsigned short)options().selfport(),
+      options().hostname(),
+      (unsigned short)options().port(),
+      this
+      );
+    printf("LOADED CLIENT\n");
+    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
+    if(!retval)
     {
-      ui().popup_time(10, "This game does not have complete save state support, desyncs may not be resolved correctly.");
+      exit(MAMERR_NETWORK);
     }
+    //if(netClient->getSecondsBetweenSync())
+    //doPostLoad(this);
+  }
 
-    //After loading config but before loading nvram, initialize the network
-    if(netServer)
-    {
-      netServer->setSecondsBetweenSync(options().secondsBetweenSync());
+  // disallow save state registrations starting here.
+  // Don't do it earlier, config load can create network
+  // devices with timers.
+  m_save.allow_registration(false);
 
-      if(!netServer->initializeConnection())
-      {
-        return MAMERR_NETWORK;
-      }
-    }
+  nvram_load();
+  sound().ui_mute(false);
 
-    if(netClient)
-    {
-      /* specify the filename to save or load */
-      //set_saveload_filename(machine, "1");
-      //handle_load(machine);
-      //if(netClient->getSecondsBetweenSync())
-      //doPreSave(this);
-      bool retval = netClient->initializeConnection(
-        (unsigned short)options().selfport(),
-        options().hostname(),
-        (unsigned short)options().port(),
-        this
-        );
-      printf("LOADED CLIENT\n");
-      cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
-      if(!retval)
-      {
-        exit(MAMERR_NETWORK);
-      }
-      //if(netClient->getSecondsBetweenSync())
-      //doPostLoad(this);
-    }
+  // initialize ui lists
+  ui().initialize(*this);
 
-    // disallow save state registrations starting here.
-    // Don't do it earlier, config load can create network
-    // devices with timers.
-    m_save.allow_registration(false);
+  // display the startup screens
+  ui().display_startup_screens(firstrun, !settingsloaded);
 
-    nvram_load();
-    sound().ui_mute(false);
-
-    // initialize ui lists
-    ui().initialize(*this);
-
-    // display the startup screens
-    ui().display_startup_screens(firstrun, !settingsloaded);
-
-    // perform a soft reset -- this takes us to the running phase
-    soft_reset();
+  // perform a soft reset -- this takes us to the running phase
+  soft_reset();
 
 #ifdef MAME_DEBUG
-    g_tagmap_finds = 0;
-    if (strcmp(config().m_gamedrv.name, "___empty") != 0)
-      g_tagmap_counter_enabled = true;
+  g_tagmap_finds = 0;
+  if (strcmp(config().m_gamedrv.name, "___empty") != 0)
+    g_tagmap_counter_enabled = true;
 #endif
-    // handle initial load
-    if (m_saveload_schedule != SLS_NONE)
-      handle_saveload();
+  // handle initial load
+  if (m_saveload_schedule != SLS_NONE)
+    handle_saveload();
 
-    printf("SOFT RESET FINISHED\n");
+  printf("SOFT RESET FINISHED\n");
 
-    emulationStartTime = RakNet::GetTimeMS();
+  emulationStartTime = RakNet::GetTimeMS();
 
-    // run the CPUs until a reset or exit
-    m_hard_reset_pending = false;
-    while ((!m_hard_reset_pending && !m_exit_pending) || m_saveload_schedule != SLS_NONE)
-    {
-      //printf("IN MAIN LOOP\n");
-      g_profiler.start(PROFILER_EXTRA);
-
-      #ifdef SDLMAME_EMSCRIPTEN
-      //break out to our async javascript loop and halt
-      js_set_main_loop(this);
-      #endif
-
-      g_profiler.stop();
-    }
-
-    // and out via the exit phase
-    m_current_phase = MACHINE_PHASE_EXIT;
-
-#ifdef MAME_DEBUG
-    if (g_tagmap_counter_enabled)
-    {
-      g_tagmap_counter_enabled = false;
-      if (*(options().command()) == 0)
-        osd_printf_info("%d tagmap lookups\n", g_tagmap_finds);
-    }
-#endif
-
-    // save the NVRAM and configuration
-    sound().ui_mute(true);
-    nvram_save();
-    config_save_settings(*this);
-  }
-  catch (emu_fatalerror &fatal)
-  {
-    osd_printf_error("FATALERROR: %s\n", fatal.string());
-    error = MAMERR_FATALERROR;
-    if (fatal.exitcode() != 0)
-      error = fatal.exitcode();
-  }
-  catch (emu_exception &)
-  {
-    osd_printf_error("Caught unhandled emulator exception\n");
-    error = MAMERR_FATALERROR;
-  }
-  catch (binding_type_exception &btex)
-  {
-    osd_printf_error("Error performing a late bind of type %s to %s\n", btex.m_actual_type.name(), btex.m_target_type.name());
-    error = MAMERR_FATALERROR;
-  }
-  catch (add_exception &aex)
-  {
-    osd_printf_error("Tag '%s' already exists in tagged_list\n", aex.tag());
-    error = MAMERR_FATALERROR;
-  }
-  catch (std::exception &ex)
-  {
-    osd_printf_error("Caught unhandled %s exception: %s\n", typeid(ex).name(), ex.what());
-    error = MAMERR_FATALERROR;
-  }
-  catch (...)
-  {
-    osd_printf_error("Caught unhandled exception\n");
-    error = MAMERR_FATALERROR;
-  }
-
-  // make sure our phase is set properly before cleaning up,
-  // in case we got here via exception
-  m_current_phase = MACHINE_PHASE_EXIT;
-
-#ifdef MAME_DEBUG
-  if (g_tagmap_counter_enabled)
-  {
-    g_tagmap_counter_enabled = false;
-    if (*(options().command()) == 0)
-      osd_printf_info("%d tagmap lookups\n", g_tagmap_finds);
-  }
-#endif
-
-  // call all exit callbacks registered
-  call_notifiers(MACHINE_NOTIFY_EXIT);
-  zip_file_cache_clear();
-
-  // close the logfile
-  m_logfile.reset();
+  m_hard_reset_pending = false;
+  //break out to our async javascript loop and halt
+  js_set_main_loop(this);
   return error;
 }
 
@@ -1676,7 +1593,15 @@ void running_machine::presave_all_devices()
 {
   device_iterator iter(root_device());
   for (device_t *device = iter.first(); device != NULL; device = iter.next())
+  {
+    if (device == NULL)
+    {
+      std::cout << "DEVICE IS NULL" << std::endl;
+      std::cout.flush();
+    }
+
     device->pre_save();
+  }
 }
 
 
@@ -1912,7 +1837,12 @@ void system_time::full_time::set(struct tm &t)
 static running_machine * jsmess_machine;
 
 void js_main_loop() {
-  jsmess_machine->mainLoop();
+  device_scheduler * scheduler;
+	scheduler = &(jsmess_machine->scheduler());
+	attotime stoptime = scheduler->time() + attotime(0,HZ_TO_ATTOSECONDS(60));
+	while (scheduler->time() < stoptime) {
+    jsmess_machine->mainLoop();
+	}
 }
 
 void js_set_main_loop(running_machine * machine) {

@@ -15,7 +15,7 @@
 
 TARGET=mame
 TARGETOS=emscripten
-NOWERROR=1
+# NOWERROR=1
 CC=emcc
 AR=emar
 LD=emcc
@@ -491,9 +491,6 @@ ifneq ($(BUILD_JPEGLIB),1)
 DEFS += -DUSE_SYSTEM_JPEGLIB
 endif
 
-# To support casting in Lua 5.3
-DEFS += -DLUA_COMPAT_APIINTCASTS
-
 #-------------------------------------------------
 # compile flags
 # CCOMFLAGS are common flags
@@ -515,7 +512,13 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 # we compile C-only to C89 standard with GNU extensions
 # we compile C++ code to C++98 standard with GNU extensions
 
-EMFLAGS=-s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -Wfatal-errors
+EMFLAGS=-s SAFE_HEAP=1 -s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
+EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
+EMFLAGS += -Wno-unused-function -Wno-unused-variable
+
+ifdef EM_DEBUG
+EMFLAGS += -g
+endif
 
 CONLYFLAGS += $(EMFLAGS)
 ifdef CPP11
@@ -627,7 +630,6 @@ INCPATH += \
 	-I$(SRC)/lib/util \
 	-I$(SRC)/lib \
 	-I$(3RDPARTY) \
-	-I$(3RDPARTY)/lua/src \
 	-I$(3RDPARTY)/boost_thread \
 	-I$(3RDPARTY)/protobuf \
 	-I$(SRC)/osd \

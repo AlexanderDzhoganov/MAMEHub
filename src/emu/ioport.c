@@ -3234,7 +3234,7 @@ int framesSinceDelayCheck = 0;
 void ioport_manager::pollForPeerCatchup(attotime curMachineTime) {
   bool thisIsBadFrame=false;
   bool gotStale = false;
-  bool rollback = netCommon->isRollback();
+  // bool rollback = netCommon->isRollback();
   while(true) {
     static time_t realtime = time(NULL);
     bool printDebug=false;

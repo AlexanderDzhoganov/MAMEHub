@@ -33,14 +33,11 @@ void RakPeerInterface::Send(const BitStream* stream, int, int, char, RakNetGUID 
   return Send(stream->data, stream->dataPtr, 0, 0, 0, addess, broadcast);
 }
 
-void RakSleep(int) {}
-
-Time RakNet::GetTime()
-{
-  return emscripten_get_now() * 1000.0;
+void RakSleep(int ms) {
+  Sleep(ms);
 }
 
 Time RakNet::GetTimeMS()
 {
-  return emscripten_get_now();
+  return (Time)emscripten_get_now();
 }

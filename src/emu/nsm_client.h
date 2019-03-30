@@ -23,8 +23,6 @@ protected:
 
   std::vector<unsigned char> initialSyncBuffer;
 
-  RakNet::TimeUS timeBeforeSync;
-
   int syncGeneration;
   int syncSeconds;
   long long syncAttoseconds;
