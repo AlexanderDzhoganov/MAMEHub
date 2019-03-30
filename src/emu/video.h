@@ -35,7 +35,6 @@ const int MAX_FRAMESKIP = FRAMESKIP_LEVELS - 2;
 // forward references
 class render_target;
 class screen_device;
-struct avi_file;
 
 
 // ======================> video_manager
@@ -45,13 +44,6 @@ class video_manager
 	friend class screen_device;
 
 public:
-	// movie format options
-	enum movie_format
-	{
-		MF_MNG,
-		MF_AVI
-	};
-
 	// construction/destruction
 	video_manager(running_machine &machine);
 
@@ -63,7 +55,6 @@ public:
 	bool throttled() const { return m_throttled; }
 	float throttle_rate() const { return m_throttle_rate; }
 	bool fastforward() const { return m_fastforward; }
-	bool is_recording() const { return (m_mng_file != NULL || m_avi_file != NULL); }
 
 	// setters
 	void set_frameskip(int frameskip);
@@ -74,7 +65,6 @@ public:
 
 	// misc
 	void toggle_throttle();
-	void toggle_record_movie();
 
 	// render a frame
 	void frame_update(bool debug = false);
@@ -83,22 +73,11 @@ public:
 	astring &speed_text(astring &string);
 	double speed_percent() const { return m_speed_percent; }
 
-	// snapshots
-	void save_snapshot(screen_device *screen, emu_file &file);
-	void save_active_screen_snapshots();
-	void save_active_screen_snapshots_real();
-
-	// movies
-	void begin_recording(const char *name, movie_format format);
-	void end_recording(movie_format format);
-	void add_sound_to_recording(const INT16 *sound, int numsamples);
-
   // Override time for rollback
   void rollback(attotime rollbackAmount);
 
 private:
 	// internal helpers
-	void exit();
 	void screenless_update_callback(void *ptr, int param);
 	void postload();
 
@@ -115,11 +94,6 @@ private:
 	void update_frameskip();
 	void update_refresh_speed();
 	void recompute_speed(const attotime &emutime);
-
-	// snapshot/movie helpers
-	void create_snapshot_bitmap(screen_device *screen);
-	file_error open_next(emu_file &file, const char *extension);
-	void record_frame();
 
 	// internal state
 	running_machine &   m_machine;                  // reference to our machine
@@ -160,28 +134,6 @@ private:
 	INT8                m_frameskip_adjust;
 	bool                m_skipping_this_frame;      // flag: TRUE if we are skipping the current frame
 	osd_ticks_t         m_average_oversleep;        // average number of ticks the OSD oversleeps
-
-	// snapshot stuff
-	render_target *     m_snap_target;              // screen shapshot target
-	bitmap_rgb32        m_snap_bitmap;              // screen snapshot bitmap
-	bool                m_snap_native;              // are we using native per-screen layouts?
-	INT32               m_snap_width;               // width of snapshots (0 == auto)
-	INT32               m_snap_height;              // height of snapshots (0 == auto)
-
-	// movie recording - MNG
-	auto_pointer<emu_file> m_mng_file;              // handle to the open movie file
-	attotime            m_mng_frame_period;         // period of a single movie frame
-	attotime            m_mng_next_frame_time;      // time of next frame
-	UINT32              m_mng_frame;                // current movie frame number
-
-	// movie recording - AVI
-	avi_file *          m_avi_file;                 // handle to the open movie file
-	attotime            m_avi_frame_period;         // period of a single movie frame
-	attotime            m_avi_next_frame_time;      // time of next frame
-	UINT32              m_avi_frame;                // current movie frame number
-
-	// movie recording - dummy
-	bool                m_dummy_recording;          // indicates if snapshot should be created of every frame
 
 	static const UINT8      s_skiptable[FRAMESKIP_LEVELS][FRAMESKIP_LEVELS];
 

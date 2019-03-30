@@ -512,7 +512,7 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 # we compile C-only to C89 standard with GNU extensions
 # we compile C++ code to C++98 standard with GNU extensions
 
-EMFLAGS=-s SAFE_HEAP=1 -s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
+EMFLAGS=-s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
 EMFLAGS += -Wno-unused-function -Wno-unused-variable
 

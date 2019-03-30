@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <emscripten/emscripten.h>
 #include "raknet_shim.h"
 
@@ -34,7 +35,7 @@ void RakPeerInterface::Send(const BitStream* stream, int, int, char, RakNetGUID 
 }
 
 void RakSleep(int ms) {
-  Sleep(ms);
+  usleep(ms);
 }
 
 Time RakNet::GetTimeMS()

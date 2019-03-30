@@ -1059,8 +1059,6 @@ void sound_manager::update(void *ptr, int param)
 	{
 		if (!m_nosound_mode && !catchingUp && !SKIP_OSD)
 			machine().osd().update_audio_stream(finalmix, finalmix_offset / 2);
-    // JJG: TODO: Should we send sound to the recording is we are catching up?
-		machine().video().add_sound_to_recording(finalmix, finalmix_offset / 2);
 		if (m_wavfile != NULL)
 			wav_add_data_16(m_wavfile, finalmix, finalmix_offset);
 	}

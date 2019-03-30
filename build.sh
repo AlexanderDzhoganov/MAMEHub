@@ -11,7 +11,7 @@ rm mamecps1*
 
 emmake make -j5 EM_DEBUG=1 OPTIMIZE=3
 mv mamecps1 mamecps1.bc
-emcc -g -O3 -s SAFE_HEAP=1 -s DISABLE_EXCEPTION_CATCHING=0 -s USE_PTHREADS=0 -s USE_SDL=2 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -s ASSERTIONS=2 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 mamecps1.bc -o mamecps1.js
+emcc -g -O3 -s DISABLE_EXCEPTION_CATCHING=0 -s USE_PTHREADS=0 -s USE_SDL=2 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -s ASSERTIONS=2 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 mamecps1.bc -o mamecps1.js
 
 cp mamecps1.js ../emushare/public/
 cp mamecps1.wasm ../emushare/public/

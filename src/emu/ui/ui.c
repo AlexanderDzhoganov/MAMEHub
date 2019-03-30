@@ -1748,10 +1748,6 @@ UINT32 ui_manager::handler_ingame(running_machine &machine, render_container *co
 		return machine.ui().set_handler(handler_load_save, LOADSAVE_LOAD);
 	}
 
-	// handle a save snapshot request
-	if (ui_input_pressed(machine, IPT_UI_SNAPSHOT))
-		machine.video().save_active_screen_snapshots();
-
 	// toggle pause
 	if (ui_input_pressed(machine, IPT_UI_PAUSE))
 	{
@@ -1768,10 +1764,6 @@ UINT32 ui_manager::handler_ingame(running_machine &machine, render_container *co
 	// handle a toggle cheats request
 	if (ui_input_pressed(machine, IPT_UI_TOGGLE_CHEAT))
 		machine.cheat().set_enable(!machine.cheat().enabled());
-
-	// toggle movie recording
-	if (ui_input_pressed(machine, IPT_UI_RECORD_MOVIE))
-		machine.video().toggle_record_movie();
 
 	// toggle profiler display
 	if (ui_input_pressed(machine, IPT_UI_SHOW_PROFILER))
