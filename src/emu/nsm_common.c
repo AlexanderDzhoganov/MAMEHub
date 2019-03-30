@@ -235,10 +235,10 @@ void Common::upsertPeer(RakNet::RakNetGUID guid, int peerID, string name,
   if (startTime.seconds() < 1) {
     startTime = newAttotime(1, 0);
   }
+
   cout << "UPSERTING PEER WITH ID: " << peerID << " AND NAME: " << name << endl;
   peerIDs[guid] = peerID;
-  cout << "UPSERTING PEER WITH ID: " << peerID << " AND NAME: " << name << endl;
-  cout << "PEER DATA SIZE: " << peerData.size() << endl;
+
   if (peerData.find(peerID) == peerData.end()) {
     cout << "PEER DOES NOT EXIST, INSERTING" << endl;
     peerData[peerID] = PeerData(name, startTime);

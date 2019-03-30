@@ -2546,7 +2546,7 @@ time_t ioport_manager::initialize()
 {
   machine().save().save_item(NULL, "ioport", "manager", 0, m_framecount, "framecount");
 
-  for(int a=0;a<MAX_PLAYERS;a++) {
+  for(int a=0; a < MAX_PLAYERS; a++) {
     playerInputData[a].set_capacity(30000);
   }
 
@@ -3074,7 +3074,7 @@ void ioport_manager::frame_update()
   inputFrameNumber++;
 
   //cout << "UPDATING FRAME\n";
-g_profiler.start(PROFILER_INPUT);
+  g_profiler.start(PROFILER_INPUT);
 
   if(netServer)
   {
@@ -3133,9 +3133,9 @@ g_profiler.start(PROFILER_INPUT);
     }
   }
 
-  for(int a=0;a<MAX_PLAYERS;a++) {
+  for(int a = 0; a < MAX_PLAYERS; a++) {
     if(netServer) {
-      if(a==0 || netServer->hasPeerWithID(a+1)==false) {
+      if(a == 0 || netServer->hasPeerWithID(a + 1) == false) {
         inputState.add_players(a);
       }
     } else if(netClient) {
@@ -3153,7 +3153,7 @@ g_profiler.start(PROFILER_INPUT);
     bool rollback = netCommon->isRollback();
     // Calculate the time that the new inputs will take effect
     int delayFromPing=40;
-    delayFromPing = max(delayFromPing,min(600,/*baseDelayFromPing +*/ netCommon->getLargestPing(curMachineTime.seconds)/2));
+    delayFromPing = max(delayFromPing, min(600, /*baseDelayFromPing +*/ netCommon->getLargestPing(curMachineTime.seconds)/2));
     attoseconds_t attosecondsToLead = 0;
     if (!rollback) {
       attosecondsToLead = ATTOSECONDS_PER_MILLISECOND*delayFromPing;
@@ -3180,7 +3180,6 @@ g_profiler.start(PROFILER_INPUT);
       //cout << "SENDING INPUTS AT TIME " << futureInputTime.seconds << "." << futureInputTime.attoseconds << endl;
 
       nsm::Attotime nsmAttotime = attotimeToProto(futureInputTime);
-      return;
       netCommon->sendInputs(nsmAttotime, PeerInputData::INPUT, inputState);
 
       // Process my own inputs immediately because we know they won't
@@ -3198,24 +3197,16 @@ g_profiler.start(PROFILER_INPUT);
 
   vector<nsm::InputState*> remoteInputStates;
 
-  if( curMachineTime >= inputStartTime && netCommon) {
+  if(curMachineTime >= inputStartTime && netCommon) {
     remoteInputStates = fetch_remote_inputs(curMachineTime);
   }
 
-  int portIndex=0;
+  int portIndex = 0;
   for (ioport_port *port = first_port(); port != NULL; port = port->next())
   {
-    if (!netCommon) {
-      // handle playback
-      playback_port(*port);
-    }
-
-    if(netCommon) {
+    if (netCommon) {
       merge_ports(*port, remoteInputStates, portIndex);
     }
-
-    // handle record
-    record_port(*port);
 
     // call device line write handlers
     ioport_value newvalue = port->read();
@@ -3227,22 +3218,23 @@ g_profiler.start(PROFILER_INPUT);
   }
 
   g_profiler.stop();
-  //cout << "FINISHED UPDATING FRAME\n";
+  // cout << "FINISHED UPDATING FRAME\n";
 }
 
 bool waitingForClientCatchup = false;
 int framesSinceDelayCheck = 0;
 
 void ioport_manager::pollForPeerCatchup(attotime curMachineTime) {
-  bool thisIsBadFrame=false;
+  bool thisIsBadFrame = false;
   bool gotStale = false;
   // bool rollback = netCommon->isRollback();
+
   while(true) {
     static time_t realtime = time(NULL);
-    bool printDebug=false;
+    bool printDebug = false;
     if(printDebug || realtime != time(NULL))
     {
-      printDebug=true;
+      printDebug = true;
       realtime = time(NULL);
     }
 
@@ -3254,48 +3246,51 @@ void ioport_manager::pollForPeerCatchup(attotime curMachineTime) {
     while (true) {
       int oldestPeer = netCommon->getOldestPeerInputTime().first;
 
-      if(netCommon->hasPeerWithID(oldestPeer)==false) {
-        //The peer we were waiting on is gone.
+      if(netCommon->hasPeerWithID(oldestPeer) == false) {
+        // The peer we were waiting on is gone.
         continue;
       }
 
       PeerInputData peerInput = netCommon->popInput(oldestPeer);
 
-      if (peerInput.has_time()) {
-        machine().processNetworkBuffer(&peerInput, oldestPeer);
-      } else {
+      if (!peerInput.has_time()) {
         break;
       }
-    }
 
+      machine().processNetworkBuffer(&peerInput, oldestPeer);
+    }
+    
     pair<int,nsm::Attotime> peerTimeProtoPair = netCommon->getOldestPeerInputTime();
     pair<int,attotime> peerTimePair = pair<int,attotime>(peerTimeProtoPair.first,protoToAttotime(peerTimeProtoPair.second));
 
     if(peerTimePair.first == -1 || peerTimePair.second > curMachineTime) {
       if(waitingForClientCatchup) {
-        waitingForClientCatchup=false;
+        waitingForClientCatchup = false;
         machine().osd().pauseAudio(false);
       }
-      if(printDebug)
-        cout << "Peer " << peerTimePair.first << " is caught up with " << peerTimePair.second.seconds << "." << peerTimePair.second.attoseconds << endl;
 
-      if(framesSinceDelayCheck>=60 && netServer && !waitingForClientCatchup) {
+      if(printDebug) {
+        cout << "Peer " << peerTimePair.first << " is caught up with " <<
+          peerTimePair.second.seconds << "." << peerTimePair.second.attoseconds << endl;
+      }
+
+      if(framesSinceDelayCheck >= 60 && netServer && !waitingForClientCatchup) {
         cout << "Decreasing base delay from " << baseDelayFromPing;
 
         int smallestBaseDelay = machine().options().baseDelay();
-        baseDelayFromPing = max(smallestBaseDelay,baseDelayFromPing-20);
-        framesSinceDelayCheck=0;
+        baseDelayFromPing = max(smallestBaseDelay, baseDelayFromPing - 20);
+        framesSinceDelayCheck = 0;
         cout << " to " << baseDelayFromPing << endl;
         netServer->sendBaseDelay(baseDelayFromPing);
       }
 
       break;
     }
-
-    if(!thisIsBadFrame && netServer && framesSinceDelayCheck>=30 && !waitingForClientCatchup) {
+    
+    if(!thisIsBadFrame && netServer && framesSinceDelayCheck >= 30 && !waitingForClientCatchup) {
       cout << "Increasing base delay from " << baseDelayFromPing;
-      baseDelayFromPing = min(210,baseDelayFromPing+20);
-      thisIsBadFrame=true;
+      baseDelayFromPing = min(210, baseDelayFromPing + 20);
+      thisIsBadFrame = true;
       framesSinceDelayCheck = 0;
       cout << " to " << baseDelayFromPing << ": " << peerTimePair.second << " <= " << curMachineTime << endl;
       netServer->sendBaseDelay(baseDelayFromPing);
@@ -3305,20 +3300,21 @@ void ioport_manager::pollForPeerCatchup(attotime curMachineTime) {
       gotStale = true;
       cout << "Peer " << peerTimePair.first << " is stale with last input at " << peerTimePair.second.seconds << "." << peerTimePair.second.attoseconds << " (" << curMachineTime.seconds << "." << curMachineTime.attoseconds << ")" << endl;
     }
-    if(peerTimePair.second.seconds+2 < curMachineTime.seconds) {
-      waitingForClientCatchup=true;
+
+    if(peerTimePair.second.seconds + 2 < curMachineTime.seconds) {
+      waitingForClientCatchup = true;
       machine().osd().pauseAudio(true);
     }
+
     machine().ui().update_and_render(&machine().render().ui_container());
     machine().osd().update(false);
-
     osd_sleep(0);
   }
 }
 
 void ioport_manager::pollForDataAfter(int player, attotime curMachineTime) {
   while(true) {
-    bool stale=true;
+    bool stale = true;
     if (!playerInputData[player].empty()) {
       if (netCommon->isRollback()) {
         if (playerInputData[player].rbegin()->second.framecount() >= (m_framecount-60)) {
@@ -3349,15 +3345,14 @@ void ioport_manager::pollForDataAfter(int player, attotime curMachineTime) {
     bool gotInput = false;
     vector<int> peerIDs;
     netCommon->getPeerIDs(peerIDs);
-
-    for(int a=0; a<(int)peerIDs.size(); a++)
+    for(int a = 0; a < (int)peerIDs.size(); a++)
     {
       int peerID = peerIDs[a];
       PeerInputData peerInput = netCommon->popInput(peerID);
 
       if (peerInput.has_time()) {
         machine().processNetworkBuffer(&peerInput, peerID);
-        gotInput=true;
+        gotInput = true;
       }
     }
 
@@ -3368,7 +3363,6 @@ void ioport_manager::pollForDataAfter(int player, attotime curMachineTime) {
       osd_sleep(0);
       break;
     }
-
   }
 
   //if(printDebug)
@@ -3388,16 +3382,17 @@ std::vector<nsm::InputState*> ioport_manager::fetch_remote_inputs(attotime curMa
     // Only make sure we have inputs from at least a second ago
     checkInputTime.seconds -= 1;
   }
-  pollForPeerCatchup(checkInputTime);
 
-  for(int player=0;player<MAX_PLAYERS;player++) {
+  // FIXME: disabled because it stalls main loop, figure out solution
+  // pollForPeerCatchup(checkInputTime);
+
+  for(int player = 0; player < MAX_PLAYERS; player++) {
     // Poll for new player input data
-
     // Note we have to do this first or it will invalidate the iterators we assign further down
     pollForDataAfter(player, checkInputTime);
   }
 
-  for(int player=0;player<MAX_PLAYERS;player++) {
+  for(int player = 0; player < MAX_PLAYERS; player++) {
     circular_buffer<std::pair<attotime,InputState> >::reverse_iterator it = playerInputData[player].rbegin();
     circular_buffer<std::pair<attotime,InputState> >::reverse_iterator itold = playerInputData[player].rbegin();
 
@@ -3409,18 +3404,19 @@ std::vector<nsm::InputState*> ioport_manager::fetch_remote_inputs(attotime curMa
           break;
         }
       } else {
-        if(it==playerInputData[player].rend())
+        if(it == playerInputData[player].rend())
         {
           cout << "MISSING PLAYER INPUT IN THE PAST " << playerInputData[player].size() << endl;
           throw emu_fatalerror("OOPS: INVALID PLAYER INPUT");
         }
-        else if(it->first<=curMachineTime)
+        else if(it->first <= curMachineTime)
         {
           if (rollback) {
             if (player <= 1) {
               cout << "INPUT TIMES FOR " << player << ": " << it->first << " / " << curMachineTime << endl;
               cout << "INPUT DATA: " << it->second.DebugString() << endl;
             }
+
             if (netServer && player == 0 && it->first != curMachineTime) {
               cout << "Invalid machine time: " << it->first << ' ' << curMachineTime << endl;
               throw emu_fatalerror("INVALID MACHINE TIME");
@@ -3428,9 +3424,10 @@ std::vector<nsm::InputState*> ioport_manager::fetch_remote_inputs(attotime curMa
               doRollback=true;
               rollbackTime -= attotime(0,ATTOSECONDS_PER_SECOND/10);
             }
+
             retval.push_back(&(it->second));
           } else {
-            if(it==itold)
+            if(it == itold)
             {
               //throw emu_fatalerror("OOPS");
 

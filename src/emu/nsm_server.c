@@ -889,12 +889,11 @@ void Server::popSyncQueue() {
 }
 
 void Server::sendBaseDelay(int baseDelay) {
-  char *dataToSend = (char *)malloc(5);
+  char dataToSend[5];
   dataToSend[0] = ID_BASE_DELAY;
   memcpy(dataToSend + 1, &baseDelay, sizeof(int));
   // cout << "SENDING MESSAGE WITH LENGTH: " << intSize << endl;
   rakInterface->Send(dataToSend, 5, IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
                      ORDERING_CHANNEL_BASE_DELAY,
                      RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
-  free(dataToSend);
 }
