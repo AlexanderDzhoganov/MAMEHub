@@ -1,6 +1,7 @@
 #include <unistd.h>
+#include <iostream>
+
 #include <emscripten/emscripten.h>
-// #include <emscripten/bind.h>
 #include "raknet_shim.h"
 
 using namespace RakNet;
@@ -10,20 +11,13 @@ RakPeerInterface* RakPeerInterface::instance = NULL;
 struct JSPacket
 {
   std::vector<char> data;
-  unsigned int length;
   unsigned int address;
-
-  JSPacket()
-  {
-    length = 0;
-    address = 0;
-  }
 };
-
-JSPacket emptyPacket;
 
 std::vector<JSPacket> sendQueue;
 std::vector<JSPacket> recvQueue;
+
+#define MAX_PACKET_SIZE 65535
 
 extern "C" {
   void jsArrayTest(char* array)
@@ -33,45 +27,45 @@ extern "C" {
     array[2] = 4;
     array[3] = 5;
   }
-}
 
-bool jsHasEnqueuedPackets()
-{
-  return !sendQueue.empty();
-}
-
-JSPacket jsFetchNextEnqueuedPacket()
-{
-  if (sendQueue.empty())
+  int jsGetNextPacket(char* data, int* metadata)
   {
-    return emptyPacket;
+    if (sendQueue.empty())
+    {
+      return 0;
+    }
+
+    JSPacket& packet = sendQueue.back();
+
+    memcpy(data, packet.data.data(), packet.data.size() * sizeof(char));
+    metadata[0] = (int)packet.data.size();
+    metadata[1] = packet.address;
+
+    sendQueue.pop_back();
+
+    return 1;
   }
 
-  JSPacket packet = sendQueue.back();
-  sendQueue.pop_back();
-  return packet;
+  void jsEnqueuePacket(char* data, int length, int address)
+  {
+    JSPacket packet;
+    packet.data.resize(length);
+    memcpy(packet.data.data(), data, length * sizeof(char));
+    packet.address = address;
+    recvQueue.push_back(packet);
+  }
 }
-
-void jsEnqueueIncomingPacket(JSPacket packet)
-{
-  recvQueue.push_back(packet);
-}
-
-/*EMSCRIPTEN_BINDINGS(js_packet) {
-  emscripten::value_object<JSPacket>("JSPacket")
-    .field("data", &JSPacket::data)
-    .field("length", &JSPacket::length)
-    .field("address", &JSPacket::address)
-    ;
-
-  emscripten::function("jsHasEnqueuedPackets", &jsHasEnqueuedPackets);
-  emscripten::function("jsFetchNextEnqueuedPacket", &jsHasEnqueuedPackets);
-  emscripten::function("jsEnqueueIncomingPacket", &jsHasEnqueuedPackets);
-}*/
 
 void RakPeerInterface::Send(const char* data, int length, int, int, char, SystemAddress address, bool broadcast, int)
 {
-  JSPacket packet;
+  if (length >= MAX_PACKET_SIZE)
+  {
+    std::cout << "PACKET LENGTH >= MAX_PACKET SIZE" << std::endl;
+    return;
+  }
+
+  sendQueue.push_back(JSPacket());
+  JSPacket& packet = sendQueue.back();
 
   packet.data.resize(length);
   memcpy(packet.data.data(), data, length * sizeof(char));
@@ -85,7 +79,7 @@ void RakPeerInterface::Send(const char* data, int length, int, int, char, System
     packet.address = address.g;
   }
 
-  sendQueue.push_back(std::move(packet));
+  std::cout << "PACKET SENT (" << length << " BYTES)" << std::endl;
 }
 
 Packet* RakPeerInterface::Receive()
@@ -101,9 +95,10 @@ Packet* RakPeerInterface::Receive()
   Packet* packet = new Packet();
   packet->guid = js_packet.address;
   packet->systemAddress = js_packet.address;
-  packet->length = js_packet.length;
-  packet->data = new unsigned char[js_packet.length];
-  memcpy(packet->data, js_packet.data.data(), js_packet.length * sizeof(char));
+  packet->length = js_packet.data.size();
+  packet->data = new unsigned char[js_packet.data.size()];
+  memcpy(packet->data, js_packet.data.data(), js_packet.data.size() * sizeof(char));
+  std::cout << "PACKET RECEIVED" << std::endl;
 
   return packet;
 }
