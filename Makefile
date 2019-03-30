@@ -514,18 +514,14 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 
 EMFLAGS=-s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
-EMFLAGS += -Wno-unused-function -Wno-unused-variable
+EMFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-deprecated-register -Wno-c++11-narrowing
 
 ifdef EM_DEBUG
 EMFLAGS += -g
 endif
 
 CONLYFLAGS += $(EMFLAGS)
-ifdef CPP11
-CPPONLYFLAGS += -x c++ -std=gnu++11 $(EMFLAGS)
-else
-CPPONLYFLAGS += -x c++ -std=gnu++98 $(EMFLAGS)
-endif
+CPPONLYFLAGS += -x c++ -std=c++11 $(EMFLAGS)
 COBJFLAGS += -x objective-c++
 
 # this speeds it up a bit by piping between the preprocessor/compiler/assembler

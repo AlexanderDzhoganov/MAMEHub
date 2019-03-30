@@ -59,6 +59,7 @@ namespace RakNet
     std::string s;
 
     SystemAddress() : g(0), s("0") {}
+    SystemAddress(unsigned int _g) : g(_g), s(std::to_string(_g)) {}
     const char* ToString(bool = false) const { return s.c_str(); }
     void SetBinaryAddress(char* address) { g = atoi(address); s = address; }
     unsigned short GetPort() { return 0; }
@@ -181,9 +182,18 @@ namespace RakNet
     unsigned char* data;
     unsigned int length;
 
+    Packet()
+    {
+      data = NULL;
+      length = 0;
+    }
+
     ~Packet()
     {
-      delete [] data;
+      if (data != NULL)
+      {
+        delete [] data;
+      }
     }
   };
 
@@ -217,7 +227,7 @@ namespace RakNet
     // stubbed noop methods
     
     StartupResult Startup(unsigned short, SocketDescriptor*, unsigned, int = 0) { return RAKNET_STARTED; }
-    bool Connect(const char* ipAddr, unsigned short port, char*, int) { return true; }
+    bool Connect(const char* ipAddr, unsigned short port, char*, int) { return false; }
     void Shutdown(int) {}
     
     // implementation
