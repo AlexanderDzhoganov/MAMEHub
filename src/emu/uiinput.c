@@ -52,16 +52,6 @@ struct ui_input_private
 	int                         events_end;
 };
 
-
-
-/***************************************************************************
-    FUNCTION PROTOYPES
-***************************************************************************/
-
-//static void ui_input_frame_update(running_machine &machine);
-
-
-
 /***************************************************************************
     INITIALIZATION
 ***************************************************************************/
@@ -81,8 +71,6 @@ void ui_input_init(running_machine &machine)
 	/* add a frame callback to poll inputs */
 	machine.add_notifier(MACHINE_NOTIFY_FRAME, machine_notify_delegate(FUNC(ui_input_frame_update), &machine));
 }
-
-
 
 /***************************************************************************
     EVENT HANDLING

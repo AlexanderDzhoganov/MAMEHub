@@ -154,7 +154,7 @@ void video_manager::frame_update(bool debug) {
 
   attotime current_time = machine().machine_time();
   // Don't throttle if you are a network client
-  //if (!debug && !skipped_it && effective_throttle()) FIXME
+  //if (!debug && !skipped_it && effective_throttle())
   //  update_throttle(current_time);
 
   // ask the OSD to update
@@ -163,8 +163,8 @@ void video_manager::frame_update(bool debug) {
   g_profiler.stop();
 
   // perform tasks for this frame
-  //if (!debug)
-  //  machine().call_notifiers(MACHINE_NOTIFY_FRAME); FIXME
+  if (!debug)
+    machine().call_notifiers(MACHINE_NOTIFY_FRAME);
 
   // update frameskipping
   if (!netCommon && !debug)

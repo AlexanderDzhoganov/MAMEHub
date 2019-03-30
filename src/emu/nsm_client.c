@@ -60,7 +60,6 @@ Client::Client(string _username) : Common(_username, 50) {
   firstResync = true;
 
   syncPtr = compressedBuffer;
-
   selfPeerID = 0;
 }
 

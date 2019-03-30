@@ -1,9 +1,6 @@
 #ifndef __NSM_COMMON__
 #define __NSM_COMMON__
 
-// RAKNET MUST COME FIRST, OTHER LIBS TRY TO REPLACE new/delete/malloc/free WITH
-// THEIR OWN SHIT for ID_USER_PACKET_ENUM
-
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -18,7 +15,6 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/shared_ptr.hpp>
 
-// for guid, systemaddress, etc.
 #include "raknet_shim.h"
 
 #include "nsm.pb.h"

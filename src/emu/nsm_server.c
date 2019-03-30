@@ -185,9 +185,8 @@ Server::Server(string username, int _port, int _unmeasuredNoise, bool _rollback)
   rakInterface = RakNet::RakPeerInterface::GetInstance();
 
   syncCount = 0;
-
-  upsertPeer(rakInterface->GetMyGUID(), 1, username, newAttotime(1, 0));
   selfPeerID = 1;
+  upsertPeer(rakInterface->GetMyGUID(), 1, username, newAttotime(1, 0));
 }
 
 Server::~Server() {}
@@ -724,11 +723,10 @@ void Server::sync(running_machine *machine)
 {
   cout << "SYNCING (count): " << syncCount << endl;
 
-  if (syncCount>0)
+  /*if (syncCount>0)
   {
     machine->save().dispatch_presave();
-  }
-
+  }*/
   if (syncOverride)
   {
     return;
@@ -831,10 +829,10 @@ void Server::sync(running_machine *machine)
   cout << "OUT OF CRITICAL AREA\n";
   cout.flush();
 
-  if (syncCount>0)
+  /*if (syncCount>0)
   {
     machine->save().dispatch_postload();
-  }
+  }*/
 
   {
     unsigned char blockChecksum = 0;
