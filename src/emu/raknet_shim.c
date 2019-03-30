@@ -1,6 +1,6 @@
 #include <unistd.h>
 #include <emscripten/emscripten.h>
-#include <emscripten/bind.h>
+// #include <emscripten/bind.h>
 #include "raknet_shim.h"
 
 using namespace RakNet;
@@ -25,12 +25,22 @@ JSPacket emptyPacket;
 std::vector<JSPacket> sendQueue;
 std::vector<JSPacket> recvQueue;
 
-bool JS_HasEnqueuedPackets()
+extern "C" {
+  void jsArrayTest(char* array)
+  {
+    array[0] = 3;
+    array[1] = 1;
+    array[2] = 4;
+    array[3] = 5;
+  }
+}
+
+bool jsHasEnqueuedPackets()
 {
   return !sendQueue.empty();
 }
 
-JSPacket JS_FetchNextEnqueuedPacket()
+JSPacket jsFetchNextEnqueuedPacket()
 {
   if (sendQueue.empty())
   {
@@ -42,22 +52,22 @@ JSPacket JS_FetchNextEnqueuedPacket()
   return packet;
 }
 
-void JS_EnqueueIncomingPacket(JSPacket packet)
+void jsEnqueueIncomingPacket(JSPacket packet)
 {
   recvQueue.push_back(packet);
 }
 
-EMSCRIPTEN_BINDINGS(js_packet) {
+/*EMSCRIPTEN_BINDINGS(js_packet) {
   emscripten::value_object<JSPacket>("JSPacket")
     .field("data", &JSPacket::data)
     .field("length", &JSPacket::length)
     .field("address", &JSPacket::address)
     ;
 
-  emscripten::function("JS_HasEnqueuedPackets", &JS_HasEnqueuedPackets);
-  emscripten::function("JS_FetchNextEnqueuedPacket", &JS_HasEnqueuedPackets);
-  emscripten::function("JS_EnqueueIncomingPacket", &JS_HasEnqueuedPackets);
-}
+  emscripten::function("jsHasEnqueuedPackets", &jsHasEnqueuedPackets);
+  emscripten::function("jsFetchNextEnqueuedPacket", &jsHasEnqueuedPackets);
+  emscripten::function("jsEnqueueIncomingPacket", &jsHasEnqueuedPackets);
+}*/
 
 void RakPeerInterface::Send(const char* data, int length, int, int, char, SystemAddress address, bool broadcast, int)
 {

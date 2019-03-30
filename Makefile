@@ -521,7 +521,7 @@ EMFLAGS += -g
 endif
 
 CONLYFLAGS += $(EMFLAGS)
-CPPONLYFLAGS += -x c++ -std=c++11 $(EMFLAGS)
+CPPONLYFLAGS += -x c++ -std=gnu++98 $(EMFLAGS)
 COBJFLAGS += -x objective-c++
 
 # this speeds it up a bit by piping between the preprocessor/compiler/assembler
