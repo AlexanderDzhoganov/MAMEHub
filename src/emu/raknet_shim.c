@@ -71,7 +71,7 @@ Packet* RakPeerInterface::Receive()
   packet->guid = js_packet.address;
   packet->systemAddress = js_packet.address;
   packet->length = js_packet.data.size();
-  packet->data = new char[js_packet.data.size()];
+  packet->data = new unsigned char[js_packet.data.size()];
   memcpy(packet->data, js_packet.data.data(), js_packet.data.size() * sizeof(char));
 
   return packet;

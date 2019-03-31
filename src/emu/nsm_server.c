@@ -281,7 +281,7 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
   strcpy((char *)tmpbuf, peerData[assignID].name.c_str());
   tmpbuf +=
       peerData[assignID].name.length() + 1; // add 1 so we get the \0 at the end
-  rakInterface->Send(buf, int(tmpbuf - buf), RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+  rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept, false);
 
   /*{
     char buf[4096];
@@ -548,8 +548,7 @@ bool Server::update(running_machine *machine) {
 
     // We got a packet, get the identifier with our handy function
     unsigned char packetIdentifier = GetPacketIdentifier(p);
-
-    // printf("GOT PACKET %d\n",int(packetIdentifier));
+    printf("GOT PACKET %d\n", int(packetIdentifier));
 
     // Check if this is a network message packet
     switch (packetIdentifier) {

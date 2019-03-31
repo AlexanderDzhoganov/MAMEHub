@@ -179,8 +179,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
       continue; // We need the first few packets, so stall until we get them
     }
     unsigned char packetID = GetPacketIdentifier(p);
-
-    // printf("GOT PACKET: %d\n",int(packetID));
+    printf("GOT PACKET: %d\n", int(packetID));
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
@@ -236,7 +235,6 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
         // Inputs from server.  Record time if it's newer
         RakNet::BitStream timeBS((unsigned char *)&(p->data[1]),
                                  sizeof(RakNet::Time), false);
-        timeBS.EndianSwapBytes(0, sizeof(RakNet::Time));
         RakNet::Time packetTime;
         timeBS.Read(packetTime);
         cout << "Got server time: " << packetTime << endl;
@@ -418,7 +416,6 @@ bool Client::sync(running_machine *machine) {
 }
 
 bool Client::update(running_machine *machine) {
-  // RakSleep(0);
   if (printWhenCheck) {
     printWhenCheck = false;
     // printf("Checking for packets\n");
@@ -547,7 +544,6 @@ bool Client::update(running_machine *machine) {
         RakNet::BitStream timeBS((unsigned char *)&(p->data[1]),
                                  sizeof(RakNet::Time), false);
         RakNet::Time packetTime;
-        timeBS.EndianSwapBytes(0, sizeof(RakNet::Time));
         timeBS.Read(packetTime);
         if (packetTime > largestPacketTime) {
           // cout << "GOT NEW PACKET TIME: " << packetTime << endl;
@@ -569,9 +565,8 @@ bool Client::update(running_machine *machine) {
       memcpy(&secondsBetweenSync, p->data + 1, sizeof(int));
       break;
     default:
-      printf("GOT AN INVALID PACKET TYPE: %d %d %d\n", int(packetID),
-             (int(packetID) - int(ID_USER_PACKET_ENUM)), GetPacketSize(p));
-      return false;
+      printf("GOT AN INVALID PACKET TYPE: %d %d\n", int(packetID), GetPacketSize(p));
+      break;
     }
 
     rakInterface->DeallocatePacket(p);

@@ -486,7 +486,8 @@ void running_machine::mainLoop()
       ::exit(1);
     }
 
-    m_video->frame_update();
+    ui().update_and_render(&(render().ui_container()));
+    osd().update(false);
     return;
   }
 

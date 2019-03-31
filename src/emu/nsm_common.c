@@ -689,12 +689,7 @@ void Common::sendInputs(const PeerInputData &peerInputData) {
 
   string sCompress(sNoHeader.length() * 2 + 128, 0);
   sCompress[0] = ID_MAMEHUB_TIMESTAMP;
-  RakNet::BitStream timeBS((unsigned char *)&(sCompress[1]),
-                           sizeof(RakNet::Time), false);
-  timeBS.SetWriteOffset(0);
   RakNet::Time t = RakNet::GetTimeMS() - emulationStartTime;
-  timeBS.Write(t);
-  timeBS.EndianSwapBytes(0, sizeof(RakNet::Time));
   memcpy(&sCompress[1], &t, sizeof(RakNet::Time));
   sCompress[1 + sizeof(RakNet::Time)] = ID_INPUTS;
   deflateReset(&outputStream);

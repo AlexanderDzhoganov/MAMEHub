@@ -12,7 +12,7 @@
 enum
 {
   ID_TIMESTAMP = 0,
-  ID_USER_PACKET_ENUM
+  ID_USER_PACKET_ENUM = 1
 };
 
 enum
@@ -86,7 +86,7 @@ namespace RakNet
       data = new char[length];
     }
 
-    BitStream(unsigned char* _data, unsigned int length, bool copyData) : dataPtr(0)
+    BitStream(unsigned char* _data, unsigned int length, bool copyData) : dataPtr(length)
     {
       if (copyData)
       {
@@ -109,14 +109,9 @@ namespace RakNet
       }
     }
 
-    void SetWriteOffset(unsigned int offset)
-    {
-      dataPtr = offset;
-    }
-
     void WriteBits(const unsigned char* _data, int length)
     {
-      memcpy(data + dataPtr, _data, length * sizeof(char));
+      memcpy(data + dataPtr, _data, (length / 8) * sizeof(char));
       dataPtr += length;
     }
 
@@ -131,9 +126,6 @@ namespace RakNet
       _data = *((T*)(data + dataPtr));
       dataPtr += sizeof(T);
     }
-
-    // stubbed
-    void EndianSwapBytes(int byteOffset, int length) {}
   };
 
   enum
