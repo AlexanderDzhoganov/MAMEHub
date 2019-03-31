@@ -104,14 +104,13 @@ Client::createMemoryBlock(const std::string &name, unsigned char *ptr,
 }
 
 // Copied from Multiplayer.cpp
-// If the first byte is ID_TIMESTAMP or ID_MAMEHUB_TIMESTAMP, then we want the
+// If the first byte is ID_MAMEHUB_TIMESTAMP, then we want the
 // 5th byte Otherwise we want the 1st byte
 unsigned char GetPacketIdentifier(RakNet::Packet *p) {
   if (p == 0)
     return 255;
 
-  if ((unsigned char)p->data[0] == ID_TIMESTAMP ||
-      (unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
+  if ((unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
     assert(p->length > sizeof(unsigned char) + sizeof(RakNet::Time));
     return (unsigned char)p->data[sizeof(unsigned char) + sizeof(RakNet::Time)];
   } else {
@@ -123,8 +122,7 @@ unsigned char *GetPacketData(RakNet::Packet *p) {
   if (p == 0)
     return 0;
 
-  if ((unsigned char)p->data[0] == ID_TIMESTAMP ||
-      (unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
+  if ((unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
     assert(p->length > (2 * sizeof(unsigned char)) + sizeof(RakNet::Time));
     return (unsigned char *)&(
         p->data[(2 * sizeof(unsigned char)) + sizeof(RakNet::Time)]);
@@ -136,8 +134,7 @@ int GetPacketSize(RakNet::Packet *p) {
   if (p == 0)
     return 0;
 
-  if ((unsigned char)p->data[0] == ID_TIMESTAMP ||
-      (unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
+  if ((unsigned char)p->data[0] == ID_MAMEHUB_TIMESTAMP) {
     assert(p->length > (2 * sizeof(unsigned char)) + sizeof(RakNet::Time));
     return int(p->length) -
            int((2 * sizeof(unsigned char)) + sizeof(RakNet::Time));
@@ -151,26 +148,22 @@ extern bool waitingForClientCatchup;
 extern int baseDelayFromPing;
 extern attotime mostRecentSentReport;
 int doCatchup = 0;
-RakNet::RakNetGUID masterGuid(0);
 RakNet::Time largestPacketTime = 0;
 
-bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
-                                  unsigned short port,
-                                  running_machine *machine) {
+bool Client::initializeConnection(running_machine *machine) {
   isConnecting = true;
   
   {
     char buf[4096];
-    buf[0] = ID_CLIENT_INFO;
-    strcpy(buf + 1, username.c_str());
-    rakInterface->Send(buf, 1 + username.length() + 1, RakNet::UNASSIGNED_SYSTEM_ADDRESS, false);
+    buf[0] = ID_CLIENT_HANDSHAKE;
+    rakInterface->Send(buf, 1);
   }
 
   return true;
 
   // peerIDs[guid] = 1;
 
-  while (initComplete == false) {
+   /*while (initComplete == false) {
     RakNet::Packet *p = rakInterface->Receive();
     if (!p) {
       // printf("WAITING FOR SERVER TO SEND GAME WORLD...\n");
@@ -183,7 +176,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
-      /*unsigned char *dataPtr = p->data + 1;
+     unsigned char *dataPtr = p->data + 1;
       int peerID;
       memcpy(&peerID, dataPtr, sizeof(int));
       dataPtr += sizeof(int);
@@ -224,7 +217,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
         waitingForClientCatchup = true;
         machine->osd().pauseAudio(true);
       }
-      upsertPeer(guid, peerID, buf, startTime);*/
+      upsertPeer(guid, peerID, buf, startTime);
     } break;
     case ID_INPUTS: {
       if (initComplete)
@@ -264,11 +257,9 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
       }
       memcpy(&secondsBetweenSync, p->data + 2, sizeof(int));
       memcpy(&unmeasuredNoise, p->data + 2 + sizeof(int), sizeof(int));
-      char buf[4096];
-      strcpy(buf, (const char *)(p->data + 2 + (2 * sizeof(int))));
-      string s(buf, strlen(buf));
+     
       // Create peerdata for server
-      upsertPeer(p->guid, 1, buf, newAttotime(0, 0));
+      upsertPeer(p->guid, 1, newAttotime(0, 0));
     } break;
     default:
       // printf("GOT AN INVALID PACKET TYPE: %d\n",int(packetID));
@@ -279,7 +270,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
     rakInterface->DeallocatePacket(p);
   }
 
-  return true;
+  return true;*/
 }
 
 nsm::InitialSync initial_sync;
@@ -427,13 +418,15 @@ bool Client::update(running_machine *machine) {
       break;
     }
 
-    unsigned char packetID = GetPacketIdentifier(p);
-    // cout << "GOT PACKET WITH ID: " << packetID << endl;
+    int packetID = GetPacketIdentifier(p);
+    cout << "GOT PACKET WITH ID: " << packetID << endl;
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
       isConnecting = false;
-      unsigned char *tmpbuf = p->data + 1;
+      // TODO FIXME
+
+      /*unsigned char *tmpbuf = p->data + 1;
       int peerID;
       memcpy(&peerID, tmpbuf, sizeof(int));
       tmpbuf += sizeof(int);
@@ -448,9 +441,8 @@ bool Client::update(running_machine *machine) {
       tmpbuf += sizeof(attosecs);
       nsm::Attotime startTime = newAttotime(secs, attosecs);
 
-      char buf[4096];
-      strcpy(buf, (char *)(tmpbuf));
       cout << "HOST ACCEPTED\n";
+
       if (rakInterface->GetMyGUID() == guid) {
         // This is me, set my own ID and name
         selfPeerID = peerID;
@@ -463,7 +455,8 @@ bool Client::update(running_machine *machine) {
         waitingForClientCatchup = true;
         machine->osd().pauseAudio(true);
       }
-      upsertPeer(guid, peerID, buf, startTime);
+
+      upsertPeer(guid, peerID, startTime);*/
     } break;
     case ID_INITIAL_SYNC_PARTIAL: {
       // printf("GOT PARTIAL SYNC FROM SERVER\n");
@@ -530,12 +523,8 @@ bool Client::update(running_machine *machine) {
       break;
     }
     case ID_INPUTS: {
-      if (peerIDs.find(p->guid) == peerIDs.end()) {
+      if (peerIDs.find(p->sender) == peerIDs.end()) {
         throw std::runtime_error("GOT INPUTS FROM UNKNOWN PEER");
-      }
-      if (p->data[0] != ID_MAMEHUB_TIMESTAMP) {
-        throw std::runtime_error(
-            "OLD VERSION OF MAMEHUB TRYING TO TALK TO NEW VERSION");
       }
 
       //if (p->guid == masterGuid)
@@ -550,6 +539,7 @@ bool Client::update(running_machine *machine) {
           largestPacketTime = packetTime;
         }
       }
+
       string s = doInflate(GetPacketData(p), GetPacketSize(p));
       PeerInputDataList inputDataList;
       inputDataList.ParseFromString(s);
@@ -561,11 +551,11 @@ bool Client::update(running_machine *machine) {
       memcpy(&baseDelayFromPing, GetPacketData(p), sizeof(int));
       cout << " to " << baseDelayFromPing << endl;
     } break;
-    case ID_SETTINGS:
+    /*case ID_SETTINGS:
       memcpy(&secondsBetweenSync, p->data + 1, sizeof(int));
-      break;
+      break;*/
     default:
-      printf("GOT AN INVALID PACKET TYPE: %d %d\n", int(packetID), GetPacketSize(p));
+      printf("GOT AN INVALID PACKET TYPE: %d %d\n", packetID, GetPacketSize(p));
       break;
     }
 
@@ -702,8 +692,6 @@ void Client::revert(running_machine *machine) {
     cout << "(revert) STALE CHECKSUM: " << int(checksum) << endl;
   }
 }
-
-int Client::getNumSessions() { return rakInterface->NumberOfConnections(); }
 
 unsigned long long Client::getCurrentServerTime() {
   // cout << "LAST PING: " << largestPacketTime << " " <<

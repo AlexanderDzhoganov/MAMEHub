@@ -24,8 +24,9 @@ protected:
   int syncGeneration;
   int syncSeconds;
   long long syncAttoseconds;
+  std::string masterGuid;
 
-public:
+  public:
   bool isConnecting;
   bool initComplete;
 
@@ -36,8 +37,7 @@ public:
   std::vector<boost::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size);
 
-  bool initializeConnection(unsigned short selfPort, const char *hostname,
-                            unsigned short port, running_machine *machine);
+  bool initializeConnection(running_machine *machine);
 
   void updateSyncCheck();
 
@@ -53,8 +53,6 @@ public:
   bool resync(unsigned char *data, int size, running_machine *machine);
 
   inline bool isInitComplete() { return initComplete; }
-
-  int getNumSessions();
 
   unsigned long long getCurrentServerTime();
 };

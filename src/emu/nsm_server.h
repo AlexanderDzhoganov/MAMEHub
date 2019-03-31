@@ -8,51 +8,30 @@ Server *createGlobalServer(std::string _username, unsigned short _port,
 void deleteGlobalServer();
 
 class running_machine;
-
-class NameGuidAddressTriple {
-public:
-  std::string name;
-  RakNet::RakNetGUID guid;
-  RakNet::SystemAddress systemAddress;
-
-  NameGuidAddressTriple(std::string _name, RakNet::RakNetGUID _guid,
-                        RakNet::SystemAddress _systemAddress)
-      : name(_name), guid(_guid), systemAddress(_systemAddress) {}
-};
-
 class SyncProcessor;
 
 class Server : public Common {
-public:
+  public:
   bool syncOverride;
 
-protected:
+  protected:
   std::vector<boost::shared_ptr<MemoryBlock> > initialBlocks;
   nsm::Attotime staleTime;
   int staleGeneration;
 
-  int port;
-
-  int syncCount;
-
-  std::list<std::pair<unsigned char *, int> > syncPacketQueue;
-
   int syncTransferSeconds;
-
-  std::vector<RakNet::RakNetGUID> acceptedPeers;
-  std::map<RakNet::RakNetGUID, std::vector<RakNet::RakNetGUID> >
-      waitingForAcceptFrom;
-  int maxPeerID;
-  std::map<RakNet::RakNetGUID, int> deadPeerIDs;
-  std::map<RakNet::RakNetGUID, std::string> candidateNames;
-
-  bool blockNewClients;
-
-  std::shared_ptr<SyncProcessor> syncProcessor;
+  int port;
+  int syncCount;
   bool syncReady;
+  bool blockNewClients;
+  int maxPeerID;
   nsm::Sync syncProto;
 
-public:
+  std::list<std::pair<unsigned char *, int> > syncPacketQueue;
+  std::unordered_map<std::string, int> deadPeerIDs;
+  std::shared_ptr<SyncProcessor> syncProcessor;
+
+  public:
   Server(std::string _username, int _port, int _unmeasuredNoise,
          bool _rollback);
 
@@ -60,16 +39,16 @@ public:
 
   void shutdown();
 
-  void acceptPeer(RakNet::RakNetGUID guidToAccept, running_machine *machine);
+  void acceptPeer(const std::string& guid, running_machine *machine);
 
-  void removePeer(RakNet::RakNetGUID guid, running_machine *machine);
+  void removePeer(const std::string& guid, running_machine *machine);
 
   bool initializeConnection();
 
   std::vector<boost::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size);
 
-  void initialSync(const RakNet::RakNetGUID &sa, running_machine *machine);
+  void initialSync(const std::string& guid, running_machine *machine);
 
   virtual nsm::PeerInputData popInput(int peerID);
 

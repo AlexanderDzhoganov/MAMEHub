@@ -501,7 +501,7 @@ void ui_manager::update_and_render(render_container *container)
         draw_text_box(container,buf,JUSTIFY_CENTER,0.5f,0.8f,rgb_t(255,0,0,128));
 	}
 
-	if(statsVisible)
+/*	if(statsVisible)
 	{
         if(netCommon)
         {
@@ -515,7 +515,7 @@ void ui_manager::update_and_render(render_container *container)
             // draw_text_box(container,allLatencyString.c_str(),JUSTIFY_CENTER,0.9f,0.1f,rgb_t(255,0,0,128));
             // draw_text_box(container,netCommon->getStatisticsString().c_str(),JUSTIFY_CENTER,0.1f,0.1f,rgb_t(255,0,0,128));
         }
-	}
+	}*/
 
 	time_t curRealTime = time(NULL);
 	for(

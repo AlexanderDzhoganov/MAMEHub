@@ -9,70 +9,13 @@
  * RakNet library shim, calls into JavaScript
  */
 
-enum
-{
-  ID_TIMESTAMP = 0,
-  ID_USER_PACKET_ENUM = 1
-};
-
-enum
-{
-  IMMEDIATE_PRIORITY = 0,
-  RELIABLE,
-  RELIABLE_ORDERED
-};
-
 void RakSleep(int time);
 
 namespace RakNet
 {
-  enum
-  {
-    CONNECTION_ATTEMPT_STARTED = 0,
-    RAKNET_STARTED = 0
-  };
-
   typedef unsigned int Time;
-  typedef unsigned int StartupResult;
 
-  Time GetTime();
   Time GetTimeMS();
-
-  struct SystemAddress
-  {
-    public:
-    unsigned int g;
-    std::string s;
-
-    SystemAddress() : g(0), s("0") {}
-    SystemAddress(unsigned int _g) : g(_g), s(std::to_string(_g)) {}
-    const char* ToString(bool = false) const { return s.c_str(); }
-    void SetBinaryAddress(char* address) { g = atoi(address); s = address; }
-    unsigned short GetPort() { return 0; }
-    bool operator==(const SystemAddress& rhs) const { return g == rhs.g; }
-    bool operator!=(const SystemAddress& rhs) const { return g != rhs.g; }
-  };
-
-  static SystemAddress UNASSIGNED_SYSTEM_ADDRESS;
-
-  struct RakNetGUID
-  {
-    unsigned int g;
-    std::string s;
-
-    RakNetGUID()
-    {
-      // allocate random guid
-      g = 1 + random();
-      s = std::to_string(g);
-    }
-
-    RakNetGUID(unsigned int _g) : g(_g), s(std::to_string(_g)) {}
-    const char* ToString(bool = false) const { return s.c_str(); }
-    bool operator==(const RakNetGUID& rhs) const { return g == rhs.g; }
-    bool operator!=(const RakNetGUID& rhs) const { return g != rhs.g; }
-    bool operator<(const RakNetGUID& rhs) const { return g < rhs.g; }
-  };
 
   class BitStream
   {
@@ -86,7 +29,7 @@ namespace RakNet
       data = new char[length];
     }
 
-    BitStream(unsigned char* _data, unsigned int length, bool copyData) : dataPtr(length)
+    BitStream(unsigned char* _data, unsigned int length, bool copyData) : dataPtr(0)
     {
       if (copyData)
       {
@@ -140,23 +83,10 @@ namespace RakNet
     double packetlossLastSecond;
   };
 
-  struct SocketDescriptor
-  {
-    SocketDescriptor(int, int) {}
-    unsigned short port;
-  };
-
-  struct RakPeer
-  {
-    RakNetGUID guid;
-    SystemAddress systemAddress;
-    RakNetStatistics stats;
-  };
-
   struct Packet
   {
-    RakNetGUID guid;
-    SystemAddress systemAddress;
+    std::string sender;
+    std::string recipient;
     unsigned char* data;
     unsigned int length;
 
@@ -178,9 +108,6 @@ namespace RakNet
   class RakPeerInterface
   {
     static RakPeerInterface* instance;
-    std::vector<RakPeer> peers;
-    RakNetGUID guid;
-    SystemAddress address;
 
     public:
     static RakPeerInterface* GetInstance()
@@ -203,95 +130,21 @@ namespace RakNet
     }
     
     // implementation
-    RakNetGUID GetMyGUID() const
+    
+    void CloseConnection(const std::string& peer)
     {
-      return guid;
-    }
-
-    SystemAddress GetSystemAddressFromIndex(int index) const
-    {
-      if (index < 0 || index >= peers.size())
-      {
-        return UNASSIGNED_SYSTEM_ADDRESS;
-      }
-
-      return peers[index].systemAddress;
-    }
-
-    int NumberOfConnections() const
-    {
-      return peers.size();
-    }
-
-    RakNetGUID GetGuidFromSystemAddress(SystemAddress address) const
-    {
-      for (unsigned int i = 0; i < peers.size(); i++)
-      {
-        if (peers[i].systemAddress == address)
-        {
-          return peers[i].guid;
-        }
-      }
-
-      return RakNetGUID(0);
-    }
-
-    SystemAddress GetSystemAddressFromGuid(RakNetGUID guid) const
-    {
-      for (unsigned int i = 0; i < peers.size(); i++)
-      {
-        if (peers[i].guid == guid)
-        {
-          return peers[i].systemAddress;
-        }
-      }
-
-      return UNASSIGNED_SYSTEM_ADDRESS;
-    }
-
-    void CloseConnection(RakNetGUID guid, bool, unsigned char = 0, int = 0)
-    {
-      for (std::vector<RakPeer>::iterator it = peers.begin(); it != peers.end(); ++it)
-      {
-        if ((*it).guid == guid)
-        {
-          peers.erase(it);
-          return;
-        }
-      }
+      // TODO FIXME
     }
     
-    void Send(const char* data, int length, SystemAddress address, bool broadcast = false);
-
-    void Send(const char* data, int length, RakNetGUID guid, bool broadcast = false)
-    {
-      return Send(data, length, GetSystemAddressFromGuid(guid), broadcast);
-    }
-
-    void Send(const BitStream* stream, RakNetGUID guid, bool broadcast = false)
-    {
-      return Send(stream->data, stream->dataPtr, GetSystemAddressFromGuid(guid), broadcast);
-    }
-
+    void Send(const char* data, int length, const std::string& peer = "");
     Packet* Receive();
     void DeallocatePacket(Packet* packet) { delete packet; }
 
-    SystemAddress GetExternalID(SystemAddress) const { return address; }
-
-    int GetLastPing(RakNetGUID guid) const { return 0; }
-    int GetLastPing(SystemAddress address) const { return 0; }
-    int GetAveragePing(RakNetGUID address) const { return 0; }
+    int GetLastPing(const std::string& peer) const { return 0; }
+    int GetAveragePing(const std::string& peer) const { return 0; }
     
-    RakNetStatistics* GetStatistics(SystemAddress address)
+    RakNetStatistics* GetStatistics(const std::string& peer)
     {
-      for (unsigned int i = 0; i < peers.size(); i++)
-      {
-        if (peers[i].systemAddress == address)
-        {
-          return &peers[i].stats;
-        }
-      }
-
       return NULL;
     }
   };

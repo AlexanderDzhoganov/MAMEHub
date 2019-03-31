@@ -486,8 +486,8 @@ void running_machine::mainLoop()
       ::exit(1);
     }
 
-    ui().update_and_render(&(render().ui_container()));
-    osd().update(false);
+    // ui().update_and_render(&(render().ui_container()));
+    // osd().update(false);
     return;
   }
 
@@ -767,18 +767,15 @@ int running_machine::run(bool firstrun)
     //handle_load(machine);
     //if(netClient->getSecondsBetweenSync())
     //doPreSave(this);
-    bool retval = netClient->initializeConnection(
-      (unsigned short)options().selfport(),
-      options().hostname(),
-      (unsigned short)options().port(),
-      this
-      );
-    printf("LOADED CLIENT\n");
-    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
-    if(!retval)
+
+    if(!netClient->initializeConnection(this))
     {
       exit(MAMERR_NETWORK);
     }
+
+    printf("LOADED CLIENT\n");
+    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
+    
     //if(netClient->getSecondsBetweenSync())
     //doPostLoad(this);
   }

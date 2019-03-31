@@ -12,7 +12,8 @@ RakPeerInterface* RakPeerInterface::instance = NULL;
 struct JSPacket
 {
   std::vector<char> data;
-  unsigned int address;
+  std::string sender;
+  std::string recipient;
 };
 
 std::deque<JSPacket> sendQueue;
@@ -29,7 +30,7 @@ extern "C" {
     array[3] = 5;
   }
 
-  int jsGetNextPacket(char* data, int* metadata)
+  int jsGetNextPacket(char* data, char* recipient)
   {
     if (sendQueue.empty())
     {
@@ -39,20 +40,25 @@ extern "C" {
     JSPacket& packet = sendQueue.front();
 
     memcpy(data, packet.data.data(), packet.data.size() * sizeof(char));
-    metadata[0] = (int)packet.data.size();
-    metadata[1] = packet.address;
 
+    memcpy(recipient, packet.recipient.c_str(), packet.recipient.length());
+    recipient[packet.recipient.length()] = 0;
+
+    int length = (int)packet.data.size();
     sendQueue.pop_front();
 
-    return 1;
+    return length;
   }
 
-  void jsEnqueuePacket(char* data, int length, int address)
+  void jsEnqueuePacket(char* data, int length, char* sender)
   {
     JSPacket packet;
+
     packet.data.resize(length);
     memcpy(packet.data.data(), data, length * sizeof(char));
-    packet.address = address;
+
+    packet.sender = std::string(sender);
+
     recvQueue.push_back(packet);
   }
 }
@@ -68,8 +74,8 @@ Packet* RakPeerInterface::Receive()
   recvQueue.pop_front();
 
   Packet* packet = new Packet();
-  packet->guid = js_packet.address;
-  packet->systemAddress = js_packet.address;
+  packet->sender = js_packet.sender;
+  packet->recipient = js_packet.recipient;
   packet->length = js_packet.data.size();
   packet->data = new unsigned char[js_packet.data.size()];
   memcpy(packet->data, js_packet.data.data(), js_packet.data.size() * sizeof(char));
@@ -77,7 +83,7 @@ Packet* RakPeerInterface::Receive()
   return packet;
 }
 
-void RakPeerInterface::Send(const char* data, int length, SystemAddress address, bool broadcast)
+void RakPeerInterface::Send(const char* data, int length, const std::string& peer)
 {
   if (length >= MAX_PACKET_SIZE)
   {
@@ -87,8 +93,8 @@ void RakPeerInterface::Send(const char* data, int length, SystemAddress address,
 
   sendQueue.push_back(JSPacket());
   JSPacket& packet = sendQueue.back();
-  packet.address = broadcast ? 0 : address.g;
 
+  packet.recipient = peer;
   packet.data.resize(length);
   memcpy(packet.data.data(), data, length * sizeof(char));
 }

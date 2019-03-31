@@ -174,9 +174,9 @@ public:
   }
 };
 
-Server::Server(string username, int _port, int _unmeasuredNoise, bool _rollback)
-    : Common(username, _unmeasuredNoise), syncOverride(false), port(_port),
-      maxPeerID(10), blockNewClients(false) {
+Server::Server(string guid, int _port, int _unmeasuredNoise, bool _rollback)
+    : Common(guid, _unmeasuredNoise), syncOverride(false), port(_port),
+      blockNewClients(false), maxPeerID(10) {
 
   rollback = _rollback;
   cout << "ROLLBACK " << (rollback ? "ENABLED" : "DISABLED") << endl;
@@ -186,7 +186,7 @@ Server::Server(string username, int _port, int _unmeasuredNoise, bool _rollback)
 
   syncCount = 0;
   selfPeerID = 1;
-  upsertPeer(rakInterface->GetMyGUID(), 1, username, newAttotime(1, 0));
+  upsertPeer(guid, 1, newAttotime(1, 0));
 }
 
 Server::~Server() {}
@@ -198,21 +198,14 @@ void Server::shutdown() {
 
 extern RakNet::Time emulationStartTime;
 
-void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
+void Server::acceptPeer(const std::string& guidToAccept,
                         running_machine *machine) {
-  cout << "ACCEPTED PEER " << guidToAccept.ToString() << endl;
-  if (acceptedPeers.size() >= maxPeerID - 1) {
-    // Whoops! Someone took the last spot
-    rakInterface->CloseConnection(guidToAccept, true);
-    return;
-  }
-
-  // Accept this host
-  acceptedPeers.push_back(guidToAccept);
+  cout << "ACCEPTED PEER " << guidToAccept << endl;
+ 
   char buf[16 * 4096];
   buf[0] = ID_HOST_ACCEPTED;
   int assignID = -1;
-  for (std::map<RakNet::RakNetGUID, int>::iterator it = deadPeerIDs.begin();
+  for (std::unordered_map<std::string, int>::iterator it = deadPeerIDs.begin();
        it != deadPeerIDs.end(); it++) {
     if (it->first == guidToAccept) {
       assignID = it->second;
@@ -229,7 +222,7 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
         lastUsedPeerID = 2;
       usingNextPeerID = false;
 
-      for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
+      for (std::unordered_map<std::string, int>::iterator it = peerIDs.begin();
            it != peerIDs.end(); it++) {
         if (it->second == lastUsedPeerID) {
           usingNextPeerID = true;
@@ -238,11 +231,11 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
       }
       if (!usingNextPeerID) {
         // We took a dead person's ID, delete their history
-        for (std::map<RakNet::RakNetGUID, int>::iterator it =
+        for (std::unordered_map<std::string, int>::iterator it =
                  deadPeerIDs.begin();
              it != deadPeerIDs.end();) {
           if (it->second == lastUsedPeerID) {
-            std::map<RakNet::RakNetGUID, int>::iterator itold = it;
+            std::unordered_map<std::string, int>::iterator itold = it;
             it++;
             deadPeerIDs.erase(itold);
           } else {
@@ -255,11 +248,13 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
   }
   nsm::Attotime at = newAttotime(machine->machine_time().seconds,
                                  machine->machine_time().attoseconds);
-  upsertPeer(guidToAccept, assignID, candidateNames[guidToAccept], at);
-  candidateNames.erase(candidateNames.find(guidToAccept));
 
   printf("ASSIGNING ID %d TO NEW CLIENT\n", assignID);
-  char *tmpbuf = buf + 1;
+  upsertPeer(guidToAccept, assignID, at);
+
+  // TODO FIX ME
+
+  /*char *tmpbuf = buf + 1;
   memcpy(tmpbuf, &assignID, sizeof(int));
   tmpbuf += sizeof(int);
   memcpy(tmpbuf, &(guidToAccept.g), sizeof(uint64_t));
@@ -281,7 +276,7 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
   strcpy((char *)tmpbuf, peerData[assignID].name.c_str());
   tmpbuf +=
       peerData[assignID].name.length() + 1; // add 1 so we get the \0 at the end
-  rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept, false);
+  rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept, false);*/
 
   /*{
     char buf[4096];
@@ -297,57 +292,12 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
   initialSync(guidToAccept, machine);
 }
 
-void Server::removePeer(RakNet::RakNetGUID guid, running_machine *machine) {
+void Server::removePeer(const std::string& guid, running_machine *machine) {
   if (peerIDs.find(guid) != peerIDs.end())
     if (peerData.find(peerIDs[guid]) != peerData.end())
       peerData.erase(peerIDs[guid]);
+
   cout << "REMOVING PEER\n";
-  if (waitingForAcceptFrom.find(guid) != waitingForAcceptFrom.end()) {
-    waitingForAcceptFrom.erase(waitingForAcceptFrom.find(guid));
-  }
-  // else
-  {
-    for (int a = 0; a < (int)acceptedPeers.size(); a++) {
-      if (acceptedPeers[a] == guid) {
-        acceptedPeers.erase(acceptedPeers.begin() + a);
-        // Add peer to the dead peer list
-        for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
-             it != peerIDs.end();) {
-          if (it->first == guid) {
-            deadPeerIDs[guid] = it->second;
-            std::map<RakNet::RakNetGUID, int>::iterator itold = it;
-            it++;
-            peerIDs.erase(itold);
-            break;
-          } else {
-            it++;
-          }
-        }
-        break;
-      }
-    }
-    for (std::map<RakNet::RakNetGUID, std::vector<RakNet::RakNetGUID> >::iterator
-             it = waitingForAcceptFrom.begin();
-         it != waitingForAcceptFrom.end();) {
-      for (int a = 0; a < (int)it->second.size(); a++) {
-        if (it->second[a] == guid) {
-          it->second.erase(it->second.begin() + a);
-          a--;
-        }
-      }
-      if (it->second.empty()) {
-        // A peer is now accepted because the person judging them disconnected
-        RakNet::RakNetGUID accpetedPeer = it->first;
-        std::map<RakNet::RakNetGUID, std::vector<RakNet::RakNetGUID> >::iterator
-            oldit = it;
-        it++;
-        waitingForAcceptFrom.erase(oldit);
-        acceptPeer(accpetedPeer, machine);
-      } else {
-        it++;
-      }
-    }
-  }
 }
 
 bool Server::initializeConnection() {
@@ -392,9 +342,9 @@ extern bool waitingForClientCatchup;
 attotime oldInputTime;
 extern int nvram_size(running_machine &machine);
 
-void Server::initialSync(const RakNet::RakNetGUID &guid,
+void Server::initialSync(const std::string& guid,
                          running_machine *machine) {
-  cout << "INITIAL SYNC WITH GUID: " << guid.ToString() << " AT TIME "
+  cout << "INITIAL SYNC WITH GUID: " << guid << " AT TIME "
        << staleTime.seconds() << "." << staleTime.attoseconds() << endl;
   unsigned char checksum = 0;
 
@@ -432,7 +382,7 @@ void Server::initialSync(const RakNet::RakNetGUID &guid,
   waitingForClientCatchup = true;
   machine->osd().pauseAudio(true);
 
-  for (map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
+  for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
        it++) {
     nsm::PeerInputDataList *peer_data = initial_sync.add_peer_data();
     peer_data->set_peer_id(it->first);
@@ -499,7 +449,7 @@ void Server::initialSync(const RakNet::RakNetGUID &guid,
                             8 * packetSize);
     sizeRemaining -= packetSize;
     offset += packetSize;
-    rakInterface->Send(&bitStreamPart, guid, false);
+    rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
     machine->ui().update_and_render(&machine->render().ui_container());
     machine->osd().update(false);
     RakSleep(0);
@@ -512,7 +462,7 @@ void Server::initialSync(const RakNet::RakNetGUID &guid,
                             8 * sizeof(unsigned char));
     bitStreamPart.WriteBits((const unsigned char *)(s.c_str() + offset),
                             8 * sizeRemaining);
-    rakInterface->Send(&bitStreamPart, guid, false);
+    rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
     machine->ui().update_and_render(&machine->render().ui_container());
     machine->osd().update(false);
     RakSleep(0);
@@ -547,23 +497,22 @@ bool Server::update(running_machine *machine) {
     }
 
     // We got a packet, get the identifier with our handy function
-    unsigned char packetIdentifier = GetPacketIdentifier(p);
+    int packetIdentifier = GetPacketIdentifier(p);
     printf("GOT PACKET %d\n", int(packetIdentifier));
 
     // Check if this is a network message packet
     switch (packetIdentifier) {
-    case ID_CLIENT_INFO:
-      cout << "GOT ID_CLIENT_INFO\n";
+    case ID_CLIENT_HANDSHAKE:
+      cout << "GOT ID_CLIENT_HANDSHAKE\n";
       
       if (blockNewClients) {
         cout << "NOT ACCEPTING NEW CLIENTS\n";
         // We aren't allowing new clients
-        rakInterface->CloseConnection(p->guid, true);
+        rakInterface->CloseConnection(p->sender);
         break;
       }
 
-      candidateNames[p->guid] = "player";
-      acceptPeer(p->guid, machine);
+      acceptPeer(p->sender, machine);
       break;
 
     case ID_INPUTS: {
@@ -574,7 +523,7 @@ bool Server::update(running_machine *machine) {
       break;
     }
     default:
-      printf("UNEXPECTED PACKET ID: %d\n", int(packetIdentifier));
+      printf("UNEXPECTED PACKET ID: %d\n", packetIdentifier);
       break;
     }
 
@@ -746,8 +695,7 @@ void Server::popSyncQueue() {
 
     // TODO: Found memory corruption when waiting to send, either
     // change all of these to immediate or find the corruption.
-    rakInterface->Send((const char *)syncPacket.first, syncPacket.second,
-                       RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+    rakInterface->Send((const char *)syncPacket.first, syncPacket.second);
   }
 }
 
@@ -756,5 +704,5 @@ void Server::sendBaseDelay(int baseDelay) {
   dataToSend[0] = ID_BASE_DELAY;
   memcpy(dataToSend + 1, &baseDelay, sizeof(int));
   // cout << "SENDING MESSAGE WITH LENGTH: " << intSize << endl;
-  rakInterface->Send(dataToSend, 5, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+  rakInterface->Send(dataToSend, 5);
 }

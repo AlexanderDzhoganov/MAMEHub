@@ -115,7 +115,7 @@ MemoryBlock::~MemoryBlock() {
 extern volatile bool memoryBlocksLocked;
 
 // Copied from Multiplayer.cpp
-// If the first byte is ID_TIMESTAMP or ID_MAMEHUB_TIMESTAMP, then we want the
+// If the first byte is ID_MAMEHUB_TIMESTAMP, then we want the
 // 5th byte Otherwise we want the 1st byte
 extern unsigned char GetPacketIdentifier(RakNet::Packet *p);
 extern unsigned char *GetPacketData(RakNet::Packet *p);
@@ -153,45 +153,6 @@ Common::~Common() {}
 
 extern int baseDelayFromPing;
 
-RakNet::SystemAddress Common::ConnectBlocking(const char *defaultAddress,
-                                              unsigned short defaultPort,
-                                              bool newClient) {
-  char ipAddr[64];
-  {
-    { strcpy(ipAddr, defaultAddress); }
-  }
-
-  printf("Connecting to %s:%d...", ipAddr, defaultPort);
-  RakNet::Packet *packet;
-  
-  while (1) {
-    for (packet = rakInterface->Receive(); packet;
-         rakInterface->DeallocatePacket(packet),
-        packet = rakInterface->Receive()) {
-      unsigned char packetID = GetPacketIdentifier(packet);
-      cout << "GOT PACKET: " << int(packetID - ID_USER_PACKET_ENUM) << endl;
-
-      /*if (packetID == ID_CONNECTION_REQUEST_ACCEPTED) {
-        printf("Connected!\n");
-        return packet->systemAddress;
-      } else*/ if (packetID == ID_INPUTS) {
-        string s = doInflate(GetPacketData(packet), GetPacketSize(packet));
-        PeerInputDataList inputDataList;
-        inputDataList.ParseFromString(s);
-        receiveInputs(&inputDataList);
-      } else if (packetID == ID_BASE_DELAY) {
-        cout << "Changing base delay from " << baseDelayFromPing;
-        memcpy(&baseDelayFromPing, GetPacketData(packet), sizeof(int));
-        cout << " to " << baseDelayFromPing << endl;
-      } else {
-        printf("Failed: %d\n", int(packet->data[0]));
-        return RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-      }
-      // JJG: Need to sleep for 1/10th a sec here osd_sleep(100);
-    }
-  }
-}
-
 std::string Common::doInflate(const unsigned char *inputString, int length) {
   int chunkSize = 128 * 1024;
   vector<char> v(chunkSize, '\0');
@@ -226,21 +187,20 @@ std::string Common::doInflate(const unsigned char *inputString, int length) {
   return s;
 }
 
-void Common::upsertPeer(RakNet::RakNetGUID guid, int peerID, string name,
-                        nsm::Attotime startTime) {
+void Common::upsertPeer(const std::string& guid, int peerID, nsm::Attotime startTime) {
   if (startTime.seconds() < 1) {
     startTime = newAttotime(1, 0);
   }
 
-  cout << "UPSERTING PEER WITH ID: " << peerID << " AND NAME: " << name << endl;
+  cout << "UPSERTING PEER WITH ID: " << peerID << " AND GUID: " << guid << endl;
   peerIDs[guid] = peerID;
 
   if (peerData.find(peerID) == peerData.end()) {
     cout << "PEER DOES NOT EXIST, INSERTING" << endl;
-    peerData[peerID] = PeerData(name, startTime);
+    peerData[peerID] = PeerData(guid, startTime);
   } else {
     cout << "PEER ALREADY EXISTS, UPDATING" << endl;
-    peerData[peerID].name = name;
+    peerData[peerID].guid = guid;
     peerData[peerID].startTime = startTime;
   }
 }
@@ -255,7 +215,7 @@ double predictedPingVariance = 10.0;
 int numPingSamples = 0;
 
 int Common::getLargestPing(int currentSecond) {
-  time_t curSec = time(NULL);
+  /*time_t curSec = time(NULL);
   if (curSec > lastSecondChecked) {
     lastSecondChecked = curSec;
     int lastPing = -1;
@@ -296,21 +256,23 @@ int Common::getLargestPing(int currentSecond) {
                sqrt(predictedPingVariance) * 2);
   }
 
-  /*
-    int largestPing=1;
-    for(int a=0; a<rakInterface->NumberOfConnections(); a++)
-    {
-      largestPing =
-    max(rakInterface->GetAveragePing(rakInterface->GetSystemAddressFromIndex(a)),largestPing);
-    }
-    return largestPing;
+  int largestPing=1;
+  for(int a=0; a<rakInterface->NumberOfConnections(); a++)
+  {
+    largestPing =
+  max(rakInterface->GetAveragePing(rakInterface->GetSystemAddressFromIndex(a)),largestPing);
+  }
+  return largestPing;
   */
+
+  return 0;
 }
 
 bool Common::hasPeerWithID(int peerID) {
   if (selfPeerID == peerID)
     return true;
-  for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
+
+  for (std::unordered_map<std::string, int>::iterator it = peerIDs.begin();
        it != peerIDs.end(); it++) {
     if (it->second == peerID) {
       return true;
@@ -320,7 +282,7 @@ bool Common::hasPeerWithID(int peerID) {
 }
 
 string Common::getLatencyString(int peerID) {
-  for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
+  for (std::unordered_map<std::string, int>::iterator it = peerIDs.begin();
        it != peerIDs.end(); it++) {
     if (it->second == peerID) {
       char buf[4096];
@@ -334,7 +296,8 @@ string Common::getLatencyString(int peerID) {
 }
 
 string Common::getStatisticsString() {
-  RakNet::RakNetStatistics *rss;
+  return "";
+  /*RakNet::RakNetStatistics *rss;
   string retval;
   for (int a = 0; a < rakInterface->NumberOfConnections(); a++) {
     char message[4096];
@@ -351,28 +314,15 @@ string Common::getStatisticsString() {
             int((predictedPingMean + sqrt(predictedPingVariance) * 2) / 2));
     retval += string(message) + string("\n");
   }
-  return retval;
+  return retval;*/
 }
 
 void Common::getPeerIDs(vector<int> &retval) {
   retval.clear();
-  for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
+  for (std::unordered_map<std::string, int>::iterator it = peerIDs.begin();
        it != peerIDs.end(); it++) {
     retval.push_back(it->second);
   }
-}
-
-int Common::getNumPeers() { return int(peerIDs.size()); }
-
-int Common::getPeerID(int index) {
-  for (std::map<RakNet::RakNetGUID, int>::iterator it = peerIDs.begin();
-       it != peerIDs.end(); it++) {
-    if (index == 0) {
-      return it->second;
-    }
-    index--;
-  }
-  throw std::runtime_error("TRIED TO GET UNKNOWN PEER ID_");
 }
 
 PeerInputData Common::popInput(int peerID) {
@@ -713,7 +663,7 @@ void Common::sendInputs(const PeerInputData &peerInputData) {
   // cout << "SENDING INPUT PACKET OF SIZE: " << sNoHeader.length() << "
   // (compresses to " << bytesUsed << ") AT TIME " << t << endl;
 
-  rakInterface->Send(sCompress.c_str(), bytesUsed, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+  rakInterface->Send(sCompress.c_str(), bytesUsed);
 
   // "Send" the inputs to yourself
   receiveInputs(&peerInputDataList);
@@ -782,7 +732,7 @@ void Common::receiveInputs(const PeerInputDataList *inputDataList) {
 pair<int, nsm::Attotime> Common::getOldestPeerInputTime() {
   int i = -1;
   nsm::Attotime t = newAttotime(0, 0);
-  for (std::map<int, PeerData>::iterator it = peerData.begin();
+  for (std::unordered_map<int, PeerData>::iterator it = peerData.begin();
        it != peerData.end(); it++) {
     if (i == -1) {
       t = it->second.lastInputTime;

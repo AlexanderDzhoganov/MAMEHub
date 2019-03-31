@@ -8,6 +8,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <string>
 #include <vector>
@@ -30,25 +31,16 @@ void lzmaCompress(unsigned char *destBuf, int &destSize, unsigned char *srcBuf,
 void lzmaUncompress(unsigned char *destBuf, int destSize, unsigned char *srcBuf,
                     int srcSize);
 
-enum OrderingChannelType {
-  ORDERING_CHANNEL_INPUTS,
-  ORDERING_CHANNEL_BASE_DELAY,
-  ORDERING_CHANNEL_SYNC,
-  ORDERING_CHANNEL_CONST_DATA,
-  ORDERING_CHANNEL_END
-};
-
 enum CustomPacketType {
-  ID_INPUTS = 1,
-  ID_BASE_DELAY = 2,
-  ID_INITIAL_SYNC_PARTIAL = 3,
-  ID_INITIAL_SYNC_COMPLETE = 4,
-  ID_RESYNC_PARTIAL = 5,
-  ID_RESYNC_COMPLETE = 6,
-  ID_SETTINGS = 7,
+  ID_MAMEHUB_TIMESTAMP = 1,
+  ID_INPUTS = 2,
+  ID_BASE_DELAY = 3,
+  ID_INITIAL_SYNC_PARTIAL = 4,
+  ID_INITIAL_SYNC_COMPLETE = 5,
+  ID_RESYNC_PARTIAL = 6,
+  ID_RESYNC_COMPLETE = 7,
   ID_HOST_ACCEPTED = 8,
-  ID_CLIENT_INFO = 9,
-  ID_MAMEHUB_TIMESTAMP = 10
+  ID_CLIENT_HANDSHAKE = 9
 };
 
 class Client;
@@ -122,7 +114,7 @@ public:
 
 class PeerData {
 public:
-  std::string name;
+  std::string guid;
   std::list<nsm::PeerInputData> availableInputs;
   std::map<int, nsm::PeerInputData> delayedInputs;
 
@@ -133,8 +125,8 @@ public:
 
   PeerData() {}
 
-  PeerData(std::string _name, nsm::Attotime _startTime)
-      : name(_name), oldInputs(15000), startTime(_startTime),
+  PeerData(std::string _guid, nsm::Attotime _startTime)
+      : guid(_guid), oldInputs(15000), startTime(_startTime),
         lastInputTime(startTime), nextGC(0) {}
 };
 
@@ -155,10 +147,10 @@ protected:
   int unmeasuredNoise;
   bool rollback;
 
-  std::map<RakNet::RakNetGUID, int> peerIDs;
+  std::unordered_map<std::string, int> peerIDs;
 
   std::string username;
-  std::map<int, PeerData> peerData;
+  std::unordered_map<int, PeerData> peerData;
 
   std::vector<std::pair<BlockValueLocation, int> > forcedLocations;
 
@@ -167,14 +159,9 @@ public:
 
   virtual ~Common();
 
-  void upsertPeer(RakNet::RakNetGUID guid, int peerID, std::string name,
-                  nsm::Attotime startTime);
+  void upsertPeer(const std::string& guid, int peerID, nsm::Attotime startTime);
 
   int getLargestPing(int machineSeconds);
-
-  RakNet::SystemAddress ConnectBlocking(const char *defaultAddress,
-                                        unsigned short defaultPort,
-                                        bool newClient);
 
   int getSecondsBetweenSync() { return secondsBetweenSync; }
 
@@ -204,18 +191,14 @@ public:
 
   void getPeerIDs(std::vector<int> &retval);
 
-  int getNumPeers();
-
-  int getPeerID(int a);
-
   virtual nsm::PeerInputData popInput(int peerID);
 
   nsm::Attotime getStartTime(int peerID);
 
   inline int getSelfPeerID() { return selfPeerID; }
 
-  inline const std::string &getPeerNameFromID(int id) {
-    return peerData[id].name;
+  inline const std::string& getPeerNameFromID(int id) {
+    return peerData[id].guid;
   }
 
   std::vector<BlockValueLocation> getLocationsWithValue(
