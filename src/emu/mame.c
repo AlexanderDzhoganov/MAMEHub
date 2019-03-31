@@ -212,17 +212,11 @@ int machine_manager::execute()
     //Set up client/server as appropriate
     if(m_options.client())
     {
-      deleteGlobalClient();
       createGlobalClient(m_options.username());
     }
     else if(m_options.server())
     {
-      deleteGlobalServer();
-      createGlobalServer(m_options.username(),
-        (unsigned short)m_options.port(),
-        m_options.baseDelay(),
-        m_options.rollback());
-        
+      createGlobalServer(m_options.username(), m_options.baseDelay(), m_options.rollback());
       netServer->setSyncTransferTime(m_options.syncTransferSeconds());
     }
 

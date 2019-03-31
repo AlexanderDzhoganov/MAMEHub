@@ -3195,6 +3195,8 @@ void ioport_manager::frame_update()
     }
   }
 
+  return; // TODO FIXME
+
   vector<nsm::InputState*> remoteInputStates;
 
   if(curMachineTime >= inputStartTime && netCommon) {
@@ -3359,8 +3361,8 @@ void ioport_manager::pollForDataAfter(int player, attotime curMachineTime) {
     if(!gotInput)
     {
       cout << "MISSING INPUT DATA FOR PLAYER " << player << " AT " << curMachineTime.seconds << "." << curMachineTime.attoseconds << endl;
-      //throw emu_fatalerror("MISSING INPUT DATA FOR PLAYER");
-      osd_sleep(0);
+      // throw emu_fatalerror("MISSING INPUT DATA FOR PLAYER");
+      // osd_sleep(0);
       break;
     }
   }

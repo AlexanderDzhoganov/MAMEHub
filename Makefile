@@ -507,7 +507,7 @@ EMFLAGS = -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -s EMULATE_FUNCTION_P
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
 EMFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-deprecated-register -Wno-c++11-narrowing
 
-ifdef EM_DEBUG
+ifdef MAME_DEBUG
 EMFLAGS += -g
 endif
 

@@ -61,7 +61,7 @@ Client::Client(string _username) : Common(_username, 50) {
   firstResync = true;
 
   syncPtr = compressedBuffer;
-  selfPeerID = 2;
+  selfPeerID = 0;
   player = 1;
 }
 
@@ -174,7 +174,7 @@ bool Client::initializeConnection(running_machine *machine) {
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
-     unsigned char *dataPtr = p->data + 1;
+      unsigned char *dataPtr = p->data + 1;
       int peerID;
       memcpy(&peerID, dataPtr, sizeof(int));
       dataPtr += sizeof(int);
@@ -271,10 +271,9 @@ bool Client::initializeConnection(running_machine *machine) {
   return true;*/
 }
 
-void Client::loadInitialData(unsigned char *data, int size,
-                             running_machine *machine) {
-  
-  nsm::InitialSync initial_sync;
+nsm::InitialSync initial_sync;
+
+void Client::loadInitialData(unsigned char* data, int size, running_machine *machine) {
   {
     ArrayInputStream ais(data, size);
     GzipInputStream lis(&ais);
@@ -318,7 +317,9 @@ void Client::loadInitialData(unsigned char *data, int size,
       nvram_index++;
     }
   }
+}
 
+void Client::createInitialBlocks(running_machine *machine) {
   unsigned char checksum = 0;
 
   machine->save().dispatch_presave();
@@ -409,44 +410,51 @@ bool Client::update(running_machine *machine) {
       break;
     }
 
+    rakInterface->DeallocatePacket(p);
+    break;
+
+
     int packetID = GetPacketIdentifier(p);
-    cout << "GOT PACKET WITH ID: " << packetID << endl;
+    // cout << "GOT PACKET WITH ID: " << packetID << endl;
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
-      // TODO FIXME
+      // 1 bytes - id
+      // 4 bytes - assigned id
+      // 4 bytes - start time seconds
+      // 8 bytes - start time attoseconds
+      // 4 bytes - boolean
+      // 4 bytes - elapsed time
 
-      /*unsigned char *tmpbuf = p->data + 1;
-      int peerID;
-      memcpy(&peerID, tmpbuf, sizeof(int));
+      unsigned char* tmpbuf = p->data + 1;
+      memcpy(&selfPeerID, tmpbuf, sizeof(int));
       tmpbuf += sizeof(int);
-      RakNet::RakNetGUID guid;
-      memcpy(&(guid.g), tmpbuf, sizeof(uint64_t));
-      tmpbuf += sizeof(uint64_t);
+
       int secs;
       long long attosecs;
       memcpy(&secs, tmpbuf, sizeof(secs));
       tmpbuf += sizeof(secs);
       memcpy(&attosecs, tmpbuf, sizeof(attosecs));
       tmpbuf += sizeof(attosecs);
+      
       nsm::Attotime startTime = newAttotime(secs, attosecs);
 
-      cout << "HOST ACCEPTED\n";
+      cout << "HOST ACCEPTED, SELF PEER ID = " << selfPeerID << endl;
 
-      if (rakInterface->GetMyGUID() == guid) {
-        // This is me, set my own ID and name
-        selfPeerID = peerID;
-        mostRecentSentReport.seconds = startTime.seconds();
-        mostRecentSentReport.attoseconds = startTime.attoseconds();
-        cout << "CLIENT STARTED AT TIME: " << startTime.seconds() << "."
-             << startTime.attoseconds() << endl;
-      } else {
-        // This is someone else, set their ID and name
-        waitingForClientCatchup = true;
-        machine->osd().pauseAudio(true);
-      }
+      // This is me, set my own ID and name
+      mostRecentSentReport.seconds = startTime.seconds();
+      mostRecentSentReport.attoseconds = startTime.attoseconds();
+      cout << "CLIENT STARTED AT TIME: " << startTime.seconds() << "."
+            << startTime.attoseconds() << endl;
 
-      upsertPeer(guid, peerID, startTime);*/
+      memcpy(&rollback, tmpbuf, sizeof(bool));
+      tmpbuf += sizeof(bool);
+      cout << "ROLLBACK " << (rollback ? "ENABLED" : "DISABLED") << endl;
+
+      memcpy(&largestPacketTime, tmpbuf, sizeof(RakNet::Time));
+      tmpbuf += sizeof(RakNet::Time);
+
+      upsertPeer(username, selfPeerID, startTime);
     } break;
     case ID_INITIAL_SYNC_PARTIAL: {
       // printf("GOT PARTIAL SYNC FROM SERVER\n");

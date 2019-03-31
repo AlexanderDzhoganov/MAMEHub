@@ -9,11 +9,11 @@
 
 rm mamecps1*
 
-emmake make -j5 EM_DEBUG=1 OPTIMIZE=3
+emmake make -j5 OPTIMIZE=3 MAME_DEBUG=1
 
 mv mamecps1 mamecps1.bc
 
-EXPORTED_FN='["_main", "_jsGetNextPacket", "_jsEnqueuePacket"]'
+EXPORTED_FN='["_main", "_malloc", "_jsGetNextPacket", "_jsEnqueuePacket"]'
 
 emcc \
   -g -O3 \
@@ -21,10 +21,11 @@ emcc \
   -s ASSERTIONS=2 -s WASM=1 -s DEMANGLE_SUPPORT=1 \
   -s EXPORTED_FUNCTIONS="$EXPORTED_FN" \
   -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
-  -s ALLOW_MEMORY_GROWTH=1 \
+  -s TOTAL_MEMORY=512MB -s TOTAL_STACK=32MB \
   -s EMULATE_FUNCTION_POINTER_CASTS=1 \
-  -s DISABLE_EXCEPTION_CATCHING=0 -s EXCEPTION_DEBUG=1 \
+  -s DISABLE_EXCEPTION_CATCHING=0 \
   -s BINARYEN_TRAP_MODE='clamp' \
+  -s DETERMINISTIC=1 \
   mamecps1.bc -o mamecps1.js
 
 cp mamecps1.js ../emushare/public/

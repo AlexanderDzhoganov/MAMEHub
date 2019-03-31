@@ -32,11 +32,9 @@ using namespace google::protobuf::io;
 
 Server *netServer = NULL;
 
-Server *createGlobalServer(string _username, unsigned short _port,
-                           int _unmeasuredNoise, bool _rollback) {
-  cout << "Creating server" << endl;
-  netCommon = netServer =
-      new Server(_username, _port, _unmeasuredNoise, _rollback);
+Server* createGlobalServer(string _username, int _unmeasuredNoise, bool _rollback) {
+  cout << "Creating server (username = " << _username << ", noise = " << _unmeasuredNoise << ", rollback = " << _rollback << ")" << endl;
+  netCommon = netServer = new Server(_username, _unmeasuredNoise, _rollback);
   return netServer;
 }
 
@@ -173,18 +171,16 @@ public:
   }
 };
 
-Server::Server(string guid, int _port, int _unmeasuredNoise, bool _rollback)
-    : Common(guid, _unmeasuredNoise), syncOverride(false), port(_port),
-      blockNewClients(false), maxPeerID(10) {
+Server::Server(string guid, int _unmeasuredNoise, bool _rollback)
+    : Common(guid, _unmeasuredNoise), syncOverride(false), blockNewClients(false), maxPeerID(10) {
 
+  rakInterface = RakNet::RakPeerInterface::GetInstance();
   rollback = _rollback;
-  cout << "ROLLBACK " << (rollback ? "ENABLED" : "DISABLED") << endl;
 
   syncReady = false;
-  rakInterface = RakNet::RakPeerInterface::GetInstance();
-
   syncCount = 0;
   selfPeerID = 1;
+  
   upsertPeer(guid, 1, newAttotime(1, 0));
 }
 
@@ -200,9 +196,7 @@ extern RakNet::Time emulationStartTime;
 void Server::acceptPeer(const std::string& guidToAccept,
                         running_machine *machine) {
   cout << "ACCEPTED PEER " << guidToAccept << endl;
- 
-  char buf[16 * 4096];
-  buf[0] = ID_HOST_ACCEPTED;
+  
   int assignID = -1;
   for (std::unordered_map<std::string, int>::iterator it = deadPeerIDs.begin();
        it != deadPeerIDs.end(); it++) {
@@ -210,6 +204,7 @@ void Server::acceptPeer(const std::string& guidToAccept,
       assignID = it->second;
     }
   }
+
   int lastUsedPeerID = 1;
   if (assignID == -1) {
     bool usingNextPeerID = true;
@@ -243,39 +238,48 @@ void Server::acceptPeer(const std::string& guidToAccept,
         }
       }
     }
+
     assignID = lastUsedPeerID;
   }
-  nsm::Attotime at = newAttotime(machine->machine_time().seconds,
-                                 machine->machine_time().attoseconds);
 
   printf("ASSIGNING ID %d TO NEW CLIENT\n", assignID);
+
+  nsm::Attotime at = newAttotime(machine->machine_time().seconds, machine->machine_time().attoseconds);
   upsertPeer(guidToAccept, assignID, at);
 
+  {
+    char buf[32];
+
+    buf[0] = ID_HOST_ACCEPTED;
+    // 1 bytes - id
+    // 4 bytes - assigned id
+    // 4 bytes - start time seconds
+    // 8 bytes - start time attoseconds
+    // 4 bytes - boolean
+    // 4 bytes - elapsed time
+    
+    char* tmpbuf = buf + 1;
+    memcpy(tmpbuf, &assignID, sizeof(int));
+    tmpbuf += sizeof(int);
+
+    int secs = at.seconds();
+    long long attosecs = at.attoseconds();
+    memcpy(tmpbuf, &secs, sizeof(secs));
+    tmpbuf += sizeof(secs);
+    memcpy(tmpbuf, &attosecs, sizeof(attosecs));
+    tmpbuf += sizeof(attosecs);
+
+    memcpy(tmpbuf, &rollback, sizeof(bool));
+    tmpbuf += sizeof(bool);
+
+    RakNet::Time t = RakNet::GetTimeMS() - emulationStartTime;
+    memcpy(tmpbuf, &t, sizeof(RakNet::Time));
+    tmpbuf += sizeof(RakNet::Time);
+
+    rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept);
+  }
+
   // TODO FIX ME
-
-  /*char *tmpbuf = buf + 1;
-  memcpy(tmpbuf, &assignID, sizeof(int));
-  tmpbuf += sizeof(int);
-  memcpy(tmpbuf, &(guidToAccept.g), sizeof(uint64_t));
-  tmpbuf += sizeof(uint64_t);
-  int secs = peerData[assignID].startTime.seconds();
-  long long attosecs = peerData[assignID].startTime.attoseconds();
-  memcpy(tmpbuf, &secs, sizeof(secs));
-  tmpbuf += sizeof(secs);
-  memcpy(tmpbuf, &attosecs, sizeof(attosecs));
-  tmpbuf += sizeof(attosecs);
-
-  memcpy(tmpbuf, &rollback, sizeof(bool));
-  tmpbuf += sizeof(bool);
-
-  RakNet::Time t = RakNet::GetTimeMS() - emulationStartTime;
-  memcpy(tmpbuf, &t, sizeof(RakNet::Time));
-  tmpbuf += sizeof(RakNet::Time);
-
-  strcpy((char *)tmpbuf, peerData[assignID].name.c_str());
-  tmpbuf +=
-      peerData[assignID].name.length() + 1; // add 1 so we get the \0 at the end
-  rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept, false);*/
 
   /*{
     char buf[4096];
@@ -297,10 +301,6 @@ void Server::removePeer(const std::string& guid, running_machine *machine) {
       peerData.erase(peerIDs[guid]);
 
   cout << "REMOVING PEER\n";
-}
-
-bool Server::initializeConnection() {
-  return true;
 }
 
 vector<boost::shared_ptr<MemoryBlock> >
@@ -340,7 +340,7 @@ extern int nvram_size(running_machine &machine);
 
 void Server::initialSync(const std::string& guid,
                          running_machine *machine) {
-  cout << "INITIAL SYNC WITH GUID: " << guid << " AT TIME "
+  cout << "INITIAL SYNC WITH " << guid << " AT TIME "
        << staleTime.seconds() << "." << staleTime.attoseconds() << endl;
   unsigned char checksum = 0;
 
@@ -487,7 +487,7 @@ bool Server::update(running_machine *machine) {
 
     // We got a packet, get the identifier with our handy function
     int packetIdentifier = GetPacketIdentifier(p);
-    printf("GOT PACKET %d\n", int(packetIdentifier));
+    // printf("GOT PACKET %d\n", int(packetIdentifier));
 
     // Check if this is a network message packet
     switch (packetIdentifier) {

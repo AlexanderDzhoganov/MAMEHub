@@ -2,8 +2,7 @@
 
 #include "zlib.h"
 
-Server *createGlobalServer(std::string _username, unsigned short _port,
-                           int _unmeasuredNoise, bool _rollback);
+Server *createGlobalServer(std::string _username, int _unmeasuredNoise, bool _rollback);
 
 void deleteGlobalServer();
 
@@ -20,7 +19,6 @@ class Server : public Common {
   int staleGeneration;
 
   int syncTransferSeconds;
-  int port;
   int syncCount;
   bool syncReady;
   bool blockNewClients;
@@ -32,8 +30,7 @@ class Server : public Common {
   std::shared_ptr<SyncProcessor> syncProcessor;
 
   public:
-  Server(std::string _username, int _port, int _unmeasuredNoise,
-         bool _rollback);
+  Server(std::string _username, int _unmeasuredNoise, bool _rollback);
 
   virtual ~Server();
 
@@ -42,8 +39,6 @@ class Server : public Common {
   void acceptPeer(const std::string& guid, running_machine *machine);
 
   void removePeer(const std::string& guid, running_machine *machine);
-
-  bool initializeConnection();
 
   std::vector<boost::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size);

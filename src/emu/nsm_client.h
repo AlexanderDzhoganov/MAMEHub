@@ -49,6 +49,7 @@ protected:
   bool update(running_machine *machine);
 
   void loadInitialData(unsigned char *data, int size, running_machine *machine);
+  void createInitialBlocks(running_machine *machine);
 
   bool resync(unsigned char *data, int size, running_machine *machine);
 

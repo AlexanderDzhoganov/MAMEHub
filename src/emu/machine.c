@@ -472,7 +472,7 @@ UINT64 trackFrameNumber = 0;
 attotime largestEmulationTime(0,0);
 vector<int> peerIDs;
 
-bool running_machine::mainLoop()
+void running_machine::emscripten_main_loop()
 {
   if (netClient && netClient->syncing)
   {
@@ -484,7 +484,7 @@ bool running_machine::mainLoop()
       ::exit(1);
     }
 
-    return false;
+    return;
   }
 
   attotime timeBefore = m_scheduler.time();
@@ -493,7 +493,12 @@ bool running_machine::mainLoop()
   if (!m_paused)
   {
     // execute CPUs if not paused
-    m_scheduler.timeslice();
+    attotime stoptime = m_scheduler.time() + attotime(0, HZ_TO_ATTOSECONDS(60));
+
+    while (m_scheduler.time() < stoptime)
+    {
+      m_scheduler.timeslice();
+    }
   }
   else
   {
@@ -502,7 +507,6 @@ bool running_machine::mainLoop()
   }
 
   attotime timeAfter = m_scheduler.time();
-  // cout << "time: " << timeAfter.as_double() << endl;
 
   if (timeBefore > timeAfter)
   {
@@ -538,7 +542,7 @@ bool running_machine::mainLoop()
         ::exit(1);
       }
 
-      /*netCommon->getPeerIDs(peerIDs);
+      netCommon->getPeerIDs(peerIDs);
       
       for (int a = 0; a < peerIDs.size(); a++)
       {
@@ -552,7 +556,7 @@ bool running_machine::mainLoop()
 
           processNetworkBuffer(&input, peerIDs[a]);
         }
-      }*/
+      }
     }
   }
 
@@ -635,10 +639,11 @@ bool running_machine::mainLoop()
     static clock_t lastSyncTime = clock();
     if(netCommon)
     {
-      //printf("IN NET LOOP\n");
       lastSyncTime = clock();
-      //TODO: Fix forces
-      //netCommon->updateForces(getRawMemoryRegions());
+
+      // TODO: Fix forces
+      // netCommon->updateForces(getRawMemoryRegions());
+
       if(netServer)
       {
         netServer->update(this);
@@ -646,26 +651,21 @@ bool running_machine::mainLoop()
 
       if(netClient && netClient->initComplete)
       {
-        //printf("IN CLIENT LOOP\n");
-        pair<bool,bool> survivedAndGotSync;
-        survivedAndGotSync.first = netClient->update(this);
-        //printf("CLIENT UPDATED\n");
-        if(survivedAndGotSync.first==false)
+        if(!netClient->update(this))
         {
           m_exit_pending = true;
-          return false;
+          return;
         }
 
-        // Don't try to resync on the same frame that you created
-        // the sync check.
+        // Don't try to resync on the same frame that you created the sync check.
         if (lastSyncSecond != m_machine_time.seconds) {
-          bool gotSync = netClient->sync(this);
-          if(gotSync)
+          if(netClient->sync(this))
           {
             if (!m_scheduler.can_save())
             {
               printf("ANONYMOUS TIMER! THIS COULD BE BAD (BUT HOPEFULLY ISN'T)\n");
             }
+
             cout << "GOT SYNC FROM SERVER\n";
             cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
           }
@@ -674,8 +674,6 @@ bool running_machine::mainLoop()
     }
   }
 
-  // return true; // TODO FIXME, code below crashes?
-
   // handle save/load
   if (timePassed && m_saveload_schedule != SLS_NONE)
   {
@@ -683,7 +681,7 @@ bool running_machine::mainLoop()
   }
   else if (timePassed && netCommon && netCommon->isRollback())
   {
-    if (trackFrameNumber>0 && m_scheduler.can_save() && trackFrameNumber != inputFrameNumber)
+    if (trackFrameNumber > 0 && m_scheduler.can_save() && trackFrameNumber != inputFrameNumber)
     {
       isRollback = true;
       immediate_save("test");
@@ -692,7 +690,7 @@ bool running_machine::mainLoop()
       trackFrameNumber=0;
     }
 
-    if(m_machine_time.seconds>0 && m_scheduler.can_save() && tenthSecondPassed)
+    if(m_machine_time.seconds > 0 && m_scheduler.can_save() && tenthSecondPassed)
     {
       cout << "Tenth second passed: " << m_machine_time << endl;
       if (secondPassed)
@@ -716,7 +714,7 @@ bool running_machine::mainLoop()
       */
     }
     
-    if(m_machine_time.seconds>0 && m_scheduler.can_save()) {
+    if(m_machine_time.seconds > 0 && m_scheduler.can_save()) {
       if (doRollback) {
         doRollback = false;
         isRollback = true;
@@ -726,8 +724,6 @@ bool running_machine::mainLoop()
       }
     }
   }
-
-  return true;
 }
 
 int running_machine::run(bool firstrun)
@@ -764,11 +760,6 @@ int running_machine::run(bool firstrun)
   if(netServer)
   {
     netServer->setSecondsBetweenSync(options().secondsBetweenSync());
-
-    if(!netServer->initializeConnection())
-    {
-      return MAMERR_NETWORK;
-    }
   }
 
   // disallow save state registrations starting here.
@@ -788,11 +779,12 @@ int running_machine::run(bool firstrun)
   // perform a soft reset -- this takes us to the running phase
   soft_reset();
 
-#ifdef MAME_DEBUG
+  #ifdef MAME_DEBUG
   g_tagmap_finds = 0;
   if (strcmp(config().m_gamedrv.name, "___empty") != 0)
     g_tagmap_counter_enabled = true;
-#endif
+  #endif
+   
   // handle initial load
   if (m_saveload_schedule != SLS_NONE)
     handle_saveload();
@@ -802,6 +794,7 @@ int running_machine::run(bool firstrun)
   emulationStartTime = RakNet::GetTimeMS();
 
   m_hard_reset_pending = false;
+
   //break out to our async javascript loop and halt
   js_set_main_loop(this);
   return error;
@@ -1459,7 +1452,6 @@ void running_machine::watchdog_enable(bool enable)
   }
 }
 
-
 //-------------------------------------------------
 //  watchdog_fired - watchdog timer callback
 //-------------------------------------------------
@@ -1850,18 +1842,13 @@ static running_machine * jsmess_machine;
 
 void js_main_loop() {
   try {
-    device_scheduler * scheduler;
-    scheduler = &(jsmess_machine->scheduler());
-    attotime stoptime = scheduler->time() + attotime(0, HZ_TO_ATTOSECONDS(60));
-    while (scheduler->time() < stoptime) {
-      if (!jsmess_machine->mainLoop()) {
-        break;
-      }
-    }
+    jsmess_machine->emscripten_main_loop();
   } catch (const std::exception &exc) {
     std::cerr << exc.what();
+    std::cerr.flush();
   } catch (...) {
     std::cerr << "unknown exception";
+    std::cerr.flush();
   }
 }
 
@@ -1870,6 +1857,7 @@ void js_set_main_loop(running_machine * machine) {
   EM_ASM (
     JSMESS.running = true;
   );
+
   emscripten_set_main_loop(&js_main_loop, 0, 1);
 }
 

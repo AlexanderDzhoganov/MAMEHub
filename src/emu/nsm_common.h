@@ -131,7 +131,7 @@ public:
 };
 
 class Common {
-protected:
+  protected:
   RakNet::RakPeerInterface *rakInterface;
 
   int secondsBetweenSync;
@@ -154,7 +154,7 @@ protected:
 
   std::vector<std::pair<BlockValueLocation, int> > forcedLocations;
 
-public:
+  public:
   Common(std::string _username, int _unmeasuredNoise);
 
   virtual ~Common();
