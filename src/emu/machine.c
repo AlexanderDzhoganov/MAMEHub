@@ -665,7 +665,7 @@ bool running_machine::mainLoop()
     }
   }
 
-  return true; // TODO FIXME, code below crashes?
+  // return true; // TODO FIXME, code below crashes?
 
   // handle save/load
   if (timePassed && m_saveload_schedule != SLS_NONE)
@@ -717,6 +717,8 @@ bool running_machine::mainLoop()
       }
     }
   }
+
+  return true;
 }
 
 int running_machine::run(bool firstrun)

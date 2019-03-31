@@ -54,9 +54,9 @@ namespace RakNet
       }
     }
 
-    void WriteBits(const unsigned char* _data, int length)
+    void WriteBytes(const unsigned char* _data, int length)
     {
-      memcpy(data + dataPtr, _data, (length / 8) * sizeof(char));
+      memcpy(data + dataPtr, _data, length * sizeof(char));
       dataPtr += length;
     }
 

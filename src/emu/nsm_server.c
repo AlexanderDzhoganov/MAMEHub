@@ -11,7 +11,7 @@
 #include <cstring>
 #include <stdlib.h>
 
-#include "google/protobuf/io/lzma_protobuf_stream.h"
+#include "google/protobuf/io/gzip_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 #define NO_MEM_TRACKING
@@ -78,8 +78,7 @@ public:
     {
       StringOutputStream sos(&compressedSync);
       {
-        LzmaOutputStream los(&sos);
-        los.ChangeEncodingOptions(4);
+        GzipOutputStream los(&sos);
         sync->SerializeToZeroCopyStream(&los);
         los.Flush();
       }
@@ -427,8 +426,7 @@ void Server::initialSync(const std::string& guid,
   {
     StringOutputStream sos(&s);
     {
-      LzmaOutputStream los(&sos);
-      los.ChangeEncodingOptions(4);
+      GzipOutputStream los(&sos);
       initial_sync.SerializeToZeroCopyStream(&los);
       los.Flush();
     }
@@ -443,29 +441,20 @@ void Server::initialSync(const std::string& guid,
   while (sizeRemaining > packetSize) {
     RakNet::BitStream bitStreamPart(packetSize + 32);
     unsigned char header = ID_INITIAL_SYNC_PARTIAL;
-    bitStreamPart.WriteBits((const unsigned char *)&header,
-                            8 * sizeof(unsigned char));
-    bitStreamPart.WriteBits((const unsigned char *)(s.c_str() + offset),
-                            8 * packetSize);
+    bitStreamPart.WriteBytes((const unsigned char *)&header, sizeof(unsigned char));
+    bitStreamPart.WriteBytes((const unsigned char *)(s.c_str() + offset), packetSize);
+    rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
+
     sizeRemaining -= packetSize;
     offset += packetSize;
-    rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
-    // machine->ui().update_and_render(&machine->render().ui_container());
-    // machine->osd().update(false);
-    // RakSleep(0);
   }
 
   {
     RakNet::BitStream bitStreamPart(packetSize + 32);
     unsigned char header = ID_INITIAL_SYNC_COMPLETE;
-    bitStreamPart.WriteBits((const unsigned char *)&header,
-                            8 * sizeof(unsigned char));
-    bitStreamPart.WriteBits((const unsigned char *)(s.c_str() + offset),
-                            8 * sizeRemaining);
+    bitStreamPart.WriteBytes((const unsigned char *)&header, sizeof(unsigned char));
+    bitStreamPart.WriteBytes((const unsigned char *)(s.c_str() + offset), sizeRemaining);
     rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
-    // machine->ui().update_and_render(&machine->render().ui_container());
-    // machine->osd().update(false);
-    // RakSleep(0);
   }
 
   cout << "FINISHED SENDING BLOCKS TO CLIENT\n";

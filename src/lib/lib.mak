@@ -98,7 +98,6 @@ PROTOBUFOBJS = \
 	$(LIBOBJ)/protobuf/google/protobuf/wire_format_lite.o\
 \
 	$(LIBOBJ)/protobuf/google/protobuf/io/coded_stream.o\
-	$(LIBOBJ)/protobuf/google/protobuf/io/lzma_protobuf_stream.o\
 	$(LIBOBJ)/protobuf/google/protobuf/io/gzip_stream.o\
 	$(LIBOBJ)/protobuf/google/protobuf/io/printer.o\
 	$(LIBOBJ)/protobuf/google/protobuf/io/strtod.o\

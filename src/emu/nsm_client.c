@@ -2,7 +2,7 @@
 
 #include "raknet_shim.h"
 
-#include "google/protobuf/io/lzma_protobuf_stream.h"
+#include "google/protobuf/io/gzip_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 #include "nsm_client.h"
@@ -277,10 +277,9 @@ nsm::InitialSync initial_sync;
 
 void Client::loadInitialData(unsigned char *data, int size,
                              running_machine *machine) {
-
   {
     ArrayInputStream ais(data, size);
-    LzmaInputStream lis(&ais);
+    GzipInputStream lis(&ais);
     initial_sync.ParseFromZeroCopyStream(&lis);
   }
 
@@ -579,7 +578,7 @@ bool Client::resync(unsigned char *data, int size, running_machine *machine) {
 
   {
     ArrayInputStream ais(data, compressedSize);
-    LzmaInputStream lis(&ais);
+    GzipInputStream lis(&ais);
     syncProto.ParseFromZeroCopyStream(&lis);
   }
 
