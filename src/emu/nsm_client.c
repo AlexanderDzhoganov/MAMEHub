@@ -57,10 +57,12 @@ Client::Client(string _username) : Common(_username, 50) {
   // rakInterface->AllowConnectionResponseIPMigration(false);
 
   initComplete = false;
+  syncing = false;
   firstResync = true;
 
   syncPtr = compressedBuffer;
-  selfPeerID = 0;
+  selfPeerID = 2;
+  player = 1;
 }
 
 void Client::shutdown() {
@@ -150,12 +152,11 @@ extern attotime mostRecentSentReport;
 RakNet::Time largestPacketTime = 0;
 
 bool Client::initializeConnection(running_machine *machine) {
-  isConnecting = true;
-
   char buf[1];
   buf[0] = ID_CLIENT_HANDSHAKE;
   rakInterface->Send(buf, 1);
-
+  machine->osd().pauseAudio(true);
+  syncing = true;
   return true;
 
   // peerIDs[guid] = 1;
@@ -270,10 +271,10 @@ bool Client::initializeConnection(running_machine *machine) {
   return true;*/
 }
 
-nsm::InitialSync initial_sync;
-
 void Client::loadInitialData(unsigned char *data, int size,
                              running_machine *machine) {
+  
+  nsm::InitialSync initial_sync;
   {
     ArrayInputStream ais(data, size);
     GzipInputStream lis(&ais);
@@ -317,11 +318,7 @@ void Client::loadInitialData(unsigned char *data, int size,
       nvram_index++;
     }
   }
-}
 
-void Client::createInitialBlocks(running_machine *machine) {
-  std::cout << "Client::createInitialBlocks" << std::endl;
-  
   unsigned char checksum = 0;
 
   machine->save().dispatch_presave();
@@ -417,7 +414,6 @@ bool Client::update(running_machine *machine) {
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
-      isConnecting = false;
       // TODO FIXME
 
       /*unsigned char *tmpbuf = p->data + 1;
@@ -467,9 +463,13 @@ bool Client::update(running_machine *machine) {
       int curPos = (int)initialSyncBuffer.size();
       initialSyncBuffer.resize(initialSyncBuffer.size() + GetPacketSize(p));
       memcpy(&initialSyncBuffer[curPos], GetPacketData(p), GetPacketSize(p));
+
       loadInitialData(&initialSyncBuffer[0], (int)initialSyncBuffer.size(),
                       machine);
+
       initComplete = true;
+      syncing = false;
+      machine->osd().pauseAudio(false);
     } break;
     case ID_RESYNC_PARTIAL: {
       printf("GOT PARTIAL RESYNC\n");

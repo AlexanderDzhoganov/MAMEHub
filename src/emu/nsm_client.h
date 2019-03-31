@@ -29,6 +29,7 @@ protected:
   public:
   bool isConnecting;
   bool initComplete;
+  bool syncing;
 
   Client(std::string _username);
 
@@ -48,11 +49,8 @@ protected:
   bool update(running_machine *machine);
 
   void loadInitialData(unsigned char *data, int size, running_machine *machine);
-  void createInitialBlocks(running_machine *machine);
 
   bool resync(unsigned char *data, int size, running_machine *machine);
-
-  inline bool isInitComplete() { return initComplete; }
 
   unsigned long long getCurrentServerTime();
 };

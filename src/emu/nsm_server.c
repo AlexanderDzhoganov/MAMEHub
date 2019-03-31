@@ -432,7 +432,7 @@ void Server::initialSync(const std::string& guid,
     }
   }
 
-  int sizeRemaining = s.length() + sizeof(int) + sizeof(int);
+  int sizeRemaining = s.length();
   int packetSize = min(MAX_PACKET_SIZE, sizeRemaining);
   int offset = 0;
 

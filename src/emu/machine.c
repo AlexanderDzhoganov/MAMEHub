@@ -474,18 +474,18 @@ vector<int> peerIDs;
 
 bool running_machine::mainLoop()
 {
-  /*if (netClient && !netClient->initComplete)
+  if (netClient && netClient->syncing)
   {
+    m_video->frame_update();
+
     if(!netCommon->update(this))
     {
       cout << "NETWORK FAILED\n";
       ::exit(1);
     }
 
-    // ui().update_and_render(&(render().ui_container()));
-    // osd().update(false);
     return false;
-  }*/
+  }
 
   attotime timeBefore = m_scheduler.time();
   attotime machineTimeBefore = machine_time();
@@ -538,7 +538,7 @@ bool running_machine::mainLoop()
         ::exit(1);
       }
 
-      netCommon->getPeerIDs(peerIDs);
+      /*netCommon->getPeerIDs(peerIDs);
       
       for (int a = 0; a < peerIDs.size(); a++)
       {
@@ -552,7 +552,7 @@ bool running_machine::mainLoop()
 
           processNetworkBuffer(&input, peerIDs[a]);
         }
-      }
+      }*/
     }
   }
 
@@ -572,8 +572,16 @@ bool running_machine::mainLoop()
 
     if (netClient)
     {
+      if(!netClient->initializeConnection(this))
+      {
+        exit(MAMERR_NETWORK);
+      }
+
+      printf("LOADED CLIENT\n");
+      cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
+
       // Load initial data
-      netClient->createInitialBlocks(this); // TODO FIXME, why was this called here?
+      // netClient->createInitialBlocks(this); // TODO FIXME, why was this called here?
     }
   }
   else if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed)
@@ -602,6 +610,7 @@ bool running_machine::mainLoop()
 
     if(
       netClient &&
+      netClient->initComplete &&
       lastSyncSecond != m_machine_time.seconds &&
       netClient->getSecondsBetweenSync()>0 &&
       !netCommon->isRollback() &&
@@ -635,7 +644,7 @@ bool running_machine::mainLoop()
         netServer->update(this);
       }
 
-      if(netClient)
+      if(netClient && netClient->initComplete)
       {
         //printf("IN CLIENT LOOP\n");
         pair<bool,bool> survivedAndGotSync;
@@ -778,17 +787,6 @@ int running_machine::run(bool firstrun)
 
   // perform a soft reset -- this takes us to the running phase
   soft_reset();
-
-  if(netClient)
-  {
-    if(!netClient->initializeConnection(this))
-    {
-      exit(MAMERR_NETWORK);
-    }
-
-    printf("LOADED CLIENT\n");
-    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
-  }
 
 #ifdef MAME_DEBUG
   g_tagmap_finds = 0;
@@ -1851,14 +1849,20 @@ void system_time::full_time::set(struct tm &t)
 static running_machine * jsmess_machine;
 
 void js_main_loop() {
-  device_scheduler * scheduler;
-	scheduler = &(jsmess_machine->scheduler());
-	attotime stoptime = scheduler->time() + attotime(0,HZ_TO_ATTOSECONDS(60));
-	while (scheduler->time() < stoptime) {
-    if (!jsmess_machine->mainLoop()) {
-      break;
+  try {
+    device_scheduler * scheduler;
+    scheduler = &(jsmess_machine->scheduler());
+    attotime stoptime = scheduler->time() + attotime(0, HZ_TO_ATTOSECONDS(60));
+    while (scheduler->time() < stoptime) {
+      if (!jsmess_machine->mainLoop()) {
+        break;
+      }
     }
-	}
+  } catch (const std::exception &exc) {
+    std::cerr << exc.what();
+  } catch (...) {
+    std::cerr << "unknown exception";
+  }
 }
 
 void js_set_main_loop(running_machine * machine) {

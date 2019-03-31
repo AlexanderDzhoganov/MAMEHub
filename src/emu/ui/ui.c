@@ -490,7 +490,7 @@ void ui_manager::update_and_render(render_container *container)
 	}
 	else if(
         (!netClient && machine().options().client()) ||
-        (netClient && netClient->isInitComplete()==false)
+        (netClient && !netClient->initComplete)
         )
     {
         draw_text_box(container,"Please wait for server to send entire game RAM...",JUSTIFY_CENTER,0.5f,0.5f,rgb_t(255,0,0,128));
