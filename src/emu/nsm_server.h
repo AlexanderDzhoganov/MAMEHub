@@ -44,7 +44,6 @@ protected:
       waitingForAcceptFrom;
   int maxPeerID;
   std::map<RakNet::RakNetGUID, int> deadPeerIDs;
-  std::vector<NameGuidAddressTriple> potentialCandidates;
   std::map<RakNet::RakNetGUID, std::string> candidateNames;
 
   bool blockNewClients;
@@ -91,7 +90,4 @@ public:
   }
 
   inline bool isBlockNewClients() { return blockNewClients; }
-
-private:
-  void processPotentialCandidates(running_machine *machine);
 };

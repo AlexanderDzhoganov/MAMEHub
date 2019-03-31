@@ -11,21 +11,8 @@
 
 enum
 {
-  ID_CONNECTION_REQUEST_ACCEPTED = 0,
-  ID_ADVERTISE_SYSTEM,
-  ID_CONNECTION_LOST,
+  ID_TIMESTAMP = 0,
   ID_DISCONNECTION_NOTIFICATION,
-  ID_NEW_INCOMING_CONNECTION,
-  ID_INCOMPATIBLE_PROTOCOL_VERSION,
-  ID_TIMESTAMP,
-  ID_ALREADY_CONNECTED,
-  ID_REMOTE_DISCONNECTION_NOTIFICATION,
-  ID_REMOTE_CONNECTION_LOST,
-  ID_REMOTE_NEW_INCOMING_CONNECTION,
-  ID_CONNECTION_BANNED,
-  ID_CONNECTION_ATTEMPT_FAILED,
-  ID_NO_FREE_INCOMING_CONNECTIONS,
-  ID_INVALID_PASSWORD,
   ID_USER_PACKET_ENUM
 };
 
@@ -223,12 +210,6 @@ namespace RakNet
         instance = NULL;
       }
     }
-
-    // stubbed noop methods
-    
-    StartupResult Startup(unsigned short, SocketDescriptor*, unsigned, int = 0) { return RAKNET_STARTED; }
-    bool Connect(const char* ipAddr, unsigned short port, char*, int) { return false; }
-    void Shutdown(int) {}
     
     // implementation
     RakNetGUID GetMyGUID() const
@@ -289,9 +270,17 @@ namespace RakNet
       }
     }
     
-    void Send(const char* data, int length, int, int, char, RakNetGUID guid, bool broadcast = false, int = 0);
-    void Send(const char* data, int length, int, int, char, SystemAddress address, bool broadcast = false, int = 0);
-    void Send(const BitStream* stream, int, int, char, RakNetGUID guid, bool broadcast = false, int = 0);
+    void Send(const char* data, int length, RakNetGUID guid, bool broadcast = false);
+
+    void RakPeerInterface::Send(const char* data, int length, RakNetGUID guid, bool broadcast)
+    {
+      return Send(data, length, GetSystemAddressFromGuid(guid), broadcast);
+    }
+
+    void RakPeerInterface::Send(const BitStream* stream, RakNetGUID guid, bool broadcast)
+    {
+      return Send(stream->data, stream->dataPtr, GetSystemAddressFromGuid(guid, broadcast);
+    }
 
     Packet* Receive();
     void DeallocatePacket(Packet* packet) { delete packet; }

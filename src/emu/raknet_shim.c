@@ -56,32 +56,6 @@ extern "C" {
   }
 }
 
-void RakPeerInterface::Send(const char* data, int length, int, int, char, SystemAddress address, bool broadcast, int)
-{
-  if (length >= MAX_PACKET_SIZE)
-  {
-    std::cout << "PACKET LENGTH >= MAX_PACKET SIZE" << std::endl;
-    return;
-  }
-
-  sendQueue.push_back(JSPacket());
-  JSPacket& packet = sendQueue.back();
-
-  packet.data.resize(length);
-  memcpy(packet.data.data(), data, length * sizeof(char));
-
-  if (broadcast)
-  {
-    packet.address = 0;
-  }
-  else
-  {
-    packet.address = address.g;
-  }
-
-  std::cout << "PACKET SENT (" << length << " BYTES)" << std::endl;
-}
-
 Packet* RakPeerInterface::Receive()
 {
   if (recvQueue.empty())
@@ -98,24 +72,28 @@ Packet* RakPeerInterface::Receive()
   packet->length = js_packet.data.size();
   packet->data = new unsigned char[js_packet.data.size()];
   memcpy(packet->data, js_packet.data.data(), js_packet.data.size() * sizeof(char));
-  std::cout << "PACKET RECEIVED" << std::endl;
 
   return packet;
 }
 
-void RakPeerInterface::Send(const char* data, int length, int, int, char, RakNetGUID guid, bool broadcast, int)
+void RakPeerInterface::Send(const char* data, int length, SystemAddress address, bool broadcast)
 {
-  SystemAddress addess = GetSystemAddressFromGuid(guid);
-  return Send(data, length, 0, 0, 0, address, broadcast);
+  if (length >= MAX_PACKET_SIZE)
+  {
+    std::cout << "PACKET LENGTH >= MAX_PACKET SIZE" << std::endl;
+    return;
+  }
+
+  sendQueue.push_back(JSPacket());
+  JSPacket& packet = sendQueue.back();
+  packet.address = broadcast ? 0 : address.g;
+
+  packet.data.resize(length);
+  memcpy(packet.data.data(), data, length * sizeof(char));
 }
 
-void RakPeerInterface::Send(const BitStream* stream, int, int, char, RakNetGUID guid, bool broadcast, int)
+void RakSleep(int ms)
 {
-  SystemAddress addess = GetSystemAddressFromGuid(guid);
-  return Send(stream->data, stream->dataPtr, 0, 0, 0, addess, broadcast);
-}
-
-void RakSleep(int ms) {
   usleep(ms);
 }
 

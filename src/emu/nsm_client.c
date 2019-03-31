@@ -64,9 +64,6 @@ Client::Client(string _username) : Common(_username, 50) {
 }
 
 void Client::shutdown() {
-  // Be nice and let the server know we quit.
-  rakInterface->Shutdown(300);
-
   // We're done with the network
   RakNet::RakPeerInterface::DestroyInstance(rakInterface);
 }
@@ -160,21 +157,6 @@ RakNet::Time largestPacketTime = 0;
 bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
                                   unsigned short port,
                                   running_machine *machine) {
-  RakNet::SocketDescriptor socketDescriptor(0, 0);
-  socketDescriptor.port = selfPort;
-  printf("Client running on port %d\n", selfPort);
-  RakNet::StartupResult retval = rakInterface->Startup(8, &socketDescriptor, 1);
-  /*rakInterface->SetMaximumIncomingConnections(512);
-  rakInterface->SetIncomingPassword("MAME",(int)strlen("MAME"));
-  rakInterface->SetTimeoutTime(30000,RakNet::UNASSIGNED_SYSTEM_ADDRESS);
-  rakInterface->SetOccasionalPing(true);
-  rakInterface->SetUnreliableTimeout(1000);*/
-
-  if (retval != RakNet::RAKNET_STARTED) {
-    printf("Client failed to start. Terminating\n");
-    return false;
-  }
-
   RakNet::SystemAddress sa = ConnectBlocking(hostname, port, true);
   if (sa == RakNet::UNASSIGNED_SYSTEM_ADDRESS) {
     printf("Could not connect to server!\n");
@@ -187,8 +169,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
     char buf[4096];
     buf[0] = ID_CLIENT_INFO;
     strcpy(buf + 1, username.c_str());
-    rakInterface->Send(buf, 1 + username.length() + 1, IMMEDIATE_PRIORITY,
-                       RELIABLE_ORDERED, 0, sa, false);
+    rakInterface->Send(buf, 1 + username.length() + 1, sa, false);
   }
 
   peerIDs[guid] = 1;
@@ -206,71 +187,6 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
     // printf("GOT PACKET: %d\n",int(packetID));
 
     switch (packetID) {
-    case ID_DISCONNECTION_NOTIFICATION: {
-      // Connection lost normally
-      printf("ID_DISCONNECTION_NOTIFICATION\n");
-      if (selfPeerID == 0) {
-        printf("Disconnected because a connection could not be made between "
-               "you and another peer.\n");
-      }
-      return false;
-    }
-    case ID_ALREADY_CONNECTED:
-      printf("ID_ALREADY_CONNECTED\n");
-      return false;
-    case ID_INCOMPATIBLE_PROTOCOL_VERSION:
-      printf("ID_INCOMPATIBLE_PROTOCOL_VERSION\n");
-      return false;
-    case ID_REMOTE_DISCONNECTION_NOTIFICATION: // Server telling the clients of
-                                               // another client disconnecting
-                                               // gracefully.  You can manually
-                                               // broadcast this in a peer to
-                                               // peer enviroment if you want.
-      printf("ID_REMOTE_DISCONNECTION_NOTIFICATION\n");
-      return false;
-    case ID_REMOTE_CONNECTION_LOST: // Server telling the clients of another
-                                    // client disconnecting forcefully.  You can
-                                    // manually broadcast this in a peer to peer
-                                    // enviroment if you want.
-      printf("ID_REMOTE_CONNECTION_LOST\n");
-      return false;
-    case ID_REMOTE_NEW_INCOMING_CONNECTION: // Server telling the clients of
-                                            // another client connecting.  You
-                                            // can manually broadcast this in a
-                                            // peer to peer enviroment if you
-                                            // want.
-      printf("ID_REMOTE_NEW_INCOMING_CONNECTION\n");
-      break;
-    case ID_CONNECTION_BANNED: // Banned from this server
-      printf("We are banned from this server.\n");
-      return false;
-    case ID_CONNECTION_ATTEMPT_FAILED:
-      printf("Connection attempt failed\n");
-      return false;
-    case ID_NO_FREE_INCOMING_CONNECTIONS:
-      // Sorry, the server is full.  I don't do anything here but
-      // A real app should tell the user
-      printf("ID_NO_FREE_INCOMING_CONNECTIONS\n");
-      return false;
-
-    case ID_INVALID_PASSWORD:
-      printf("ID_INVALID_PASSWORD\n");
-      return false;
-
-    case ID_CONNECTION_LOST:
-      // Couldn't deliver a reliable packet - i.e. the other system was
-      // abnormally terminated
-      printf("ID_CONNECTION_LOST\n");
-      return false;
-
-    case ID_CONNECTION_REQUEST_ACCEPTED:
-      // This tells the client they have connected
-      printf("ID_CONNECTION_REQUEST_ACCEPTED to %s with GUID %s\n",
-             p->systemAddress.ToString(true), p->guid.ToString());
-      printf("My external address is %s\n",
-             rakInterface->GetExternalID(p->systemAddress).ToString(true));
-      break;
-
     case ID_HOST_ACCEPTED: {
       unsigned char *dataPtr = p->data + 1;
       int peerID;
@@ -314,27 +230,6 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
         machine->osd().pauseAudio(true);
       }
       upsertPeer(guid, peerID, buf, startTime);
-    } break;
-
-    case ID_SEND_PEER_ID: {
-      unsigned char *tmpbuf = p->data + 1;
-      int peerID;
-      memcpy(&peerID, tmpbuf, sizeof(int));
-      tmpbuf += sizeof(int);
-      int secs;
-      long long attosecs;
-      memcpy(&secs, tmpbuf, sizeof(secs));
-      tmpbuf += sizeof(secs);
-      memcpy(&(attosecs), tmpbuf, sizeof(attosecs));
-      tmpbuf += sizeof(attosecs);
-      nsm::Attotime startTime = newAttotime(secs, attosecs);
-      cout << "Matching: " << p->systemAddress.ToString() << " To " << peerID
-           << endl;
-      char buf[4096];
-      strcpy(buf, (char *)(tmpbuf));
-      cout << "Matching: " << p->systemAddress.ToString() << " To " << buf
-           << endl;
-      upsertPeer(p->guid, peerID, buf, startTime);
     } break;
 
     case ID_INITIAL_SYNC_PARTIAL: {
@@ -544,11 +439,12 @@ bool Client::sync(running_machine *machine) {
 }
 
 bool Client::update(running_machine *machine) {
-  RakSleep(0);
+  // RakSleep(0);
   if (printWhenCheck) {
     printWhenCheck = false;
     // printf("Checking for packets\n");
   }
+  
   bool inNegotiation = false;
 
   do {
@@ -564,10 +460,6 @@ bool Client::update(running_machine *machine) {
     // cout << "GOT PACKET WITH ID: " << packetID << endl;
 
     switch (packetID) {
-    case ID_CONNECTION_LOST:
-      // Couldn't deliver a reliable packet - i.e. the other system was
-      // abnormally terminated
-      printf("ID_CONNECTION_LOST\n");
     case ID_DISCONNECTION_NOTIFICATION:
       // Connection lost normally
       printf("ID_DISCONNECTION_NOTIFICATION\n");
@@ -582,106 +474,6 @@ bool Client::update(running_machine *machine) {
         }
       }
       break;
-    case ID_ALREADY_CONNECTED:
-      printf("ID_ALREADY_CONNECTED\n");
-      return false;
-      break;
-    case ID_INCOMPATIBLE_PROTOCOL_VERSION:
-      printf("ID_INCOMPATIBLE_PROTOCOL_VERSION\n");
-      return false;
-      break;
-    case ID_REMOTE_DISCONNECTION_NOTIFICATION: // Server telling the clients of
-                                               // another client disconnecting
-                                               // gracefully.  You can manually
-                                               // broadcast this in a peer to
-                                               // peer enviroment if you want.
-      printf("ID_REMOTE_DISCONNECTION_NOTIFICATION\n");
-      break;
-    case ID_REMOTE_CONNECTION_LOST: // Server telling the clients of another
-                                    // client disconnecting forcefully.  You can
-                                    // manually broadcast this in a peer to peer
-                                    // enviroment if you want.
-      printf("ID_REMOTE_CONNECTION_LOST\n");
-      break;
-    case ID_REMOTE_NEW_INCOMING_CONNECTION: // Server telling the clients of
-                                            // another client connecting.  You
-                                            // can manually broadcast this in a
-                                            // peer to peer enviroment if you
-                                            // want.
-      printf("ID_REMOTE_NEW_INCOMING_CONNECTION\n");
-      break;
-    case ID_CONNECTION_BANNED: // Banned from this server
-      printf("We are banned from this server.\n");
-      return false;
-      break;
-    case ID_CONNECTION_ATTEMPT_FAILED:
-      printf("Connection attempt failed\n");
-      return false;
-      break;
-    case ID_NO_FREE_INCOMING_CONNECTIONS:
-      // Sorry, the server is full.  I don't do anything here but
-      // A real app should tell the user
-      printf("ID_NO_FREE_INCOMING_CONNECTIONS\n");
-      return false;
-      break;
-
-    case ID_INVALID_PASSWORD:
-      printf("ID_INVALID_PASSWORD\n");
-      return false;
-      break;
-
-    case ID_CONNECTION_REQUEST_ACCEPTED:
-      // This tells the client they have connected
-      printf("ID_CONNECTION_REQUEST_ACCEPTED to %s with GUID %s\n",
-             p->systemAddress.ToString(true), p->guid.ToString());
-      printf("My external address is %s\n",
-             rakInterface->GetExternalID(p->systemAddress).ToString(true));
-      break;
-
-    case ID_ADVERTISE_SYSTEM: {
-      inNegotiation = true;
-      RakNet::SystemAddress sa;
-      sa.SetBinaryAddress(((char *)p->data) + 1);
-      RakNet::SystemAddress sa2 =
-          ConnectBlocking(sa.ToString(false), sa.GetPort(), false);
-      if (sa2 != RakNet::UNASSIGNED_SYSTEM_ADDRESS) {
-        cout << "Sending ID\n";
-        // Tell the new guy your ID and start time
-        char buf[4096];
-        buf[0] = ID_SEND_PEER_ID;
-        char *tmpbuf = buf + 1;
-        memcpy(tmpbuf, &selfPeerID, sizeof(int));
-        tmpbuf += sizeof(int);
-        attotime startTime;
-        memcpy(tmpbuf, &(startTime.seconds), sizeof(startTime.seconds));
-        tmpbuf += sizeof(startTime.seconds);
-        memcpy(tmpbuf, &(startTime.attoseconds), sizeof(startTime.attoseconds));
-        tmpbuf += sizeof(startTime.attoseconds);
-        strcpy(tmpbuf, username.c_str());
-        tmpbuf += username.length() + 1;
-        rakInterface->Send(buf, int(tmpbuf - buf), IMMEDIATE_PRIORITY,
-                           RELIABLE_ORDERED, 0, sa2, false);
-      }
-      if (sa2 == RakNet::UNASSIGNED_SYSTEM_ADDRESS) {
-        // Tell the boss that you can't accept this guy
-        char buf[4096];
-        buf[0] = ID_REJECT_NEW_HOST;
-        strcpy(buf + 1, ((char *)p->data) + 1);
-        rakInterface->Send(buf, 1 + strlen(((char *)p->data) + 1) + 1,
-                           IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0,
-                           rakInterface->GetSystemAddressFromIndex(0), false);
-      } else {
-        // Tell the boss that you can accept this guy
-        char buf[4096];
-        buf[0] = ID_ACCEPT_NEW_HOST;
-        strcpy(buf + 1, ((char *)p->data) + 1);
-        rakInterface->Send(buf, 1 + strlen(((char *)p->data) + 1) + 1,
-                           IMMEDIATE_PRIORITY, RELIABLE_ORDERED, 0,
-                           rakInterface->GetSystemAddressFromIndex(0), false);
-      }
-
-    } break;
-
     case ID_HOST_ACCEPTED: {
       inNegotiation = false;
       unsigned char *tmpbuf = p->data + 1;

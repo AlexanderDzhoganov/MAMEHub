@@ -160,14 +160,10 @@ RakNet::SystemAddress Common::ConnectBlocking(const char *defaultAddress,
   {
     { strcpy(ipAddr, defaultAddress); }
   }
-  if (rakInterface->Connect(ipAddr, defaultPort, NULL, 0) !=
-      RakNet::CONNECTION_ATTEMPT_STARTED) {
-    printf("Failed connect call for %s : %d.\n", defaultAddress,
-           int(defaultPort));
-    return RakNet::UNASSIGNED_SYSTEM_ADDRESS;
-  }
+
   printf("Connecting to %s:%d...", ipAddr, defaultPort);
   RakNet::Packet *packet;
+  
   while (1) {
     for (packet = rakInterface->Receive(); packet;
          rakInterface->DeallocatePacket(packet),
@@ -175,10 +171,10 @@ RakNet::SystemAddress Common::ConnectBlocking(const char *defaultAddress,
       unsigned char packetID = GetPacketIdentifier(packet);
       cout << "GOT PACKET: " << int(packetID - ID_USER_PACKET_ENUM) << endl;
 
-      if (packetID == ID_CONNECTION_REQUEST_ACCEPTED) {
+      /*if (packetID == ID_CONNECTION_REQUEST_ACCEPTED) {
         printf("Connected!\n");
         return packet->systemAddress;
-      } else if (packetID == ID_INPUTS) {
+      } else*/ if (packetID == ID_INPUTS) {
         string s = doInflate(GetPacketData(packet), GetPacketSize(packet));
         PeerInputDataList inputDataList;
         inputDataList.ParseFromString(s);
@@ -722,9 +718,7 @@ void Common::sendInputs(const PeerInputData &peerInputData) {
   // cout << "SENDING INPUT PACKET OF SIZE: " << sNoHeader.length() << "
   // (compresses to " << bytesUsed << ") AT TIME " << t << endl;
 
-  rakInterface->Send(sCompress.c_str(), bytesUsed, IMMEDIATE_PRIORITY, RELIABLE,
-                     ORDERING_CHANNEL_INPUTS, RakNet::UNASSIGNED_SYSTEM_ADDRESS,
-                     true);
+  rakInterface->Send(sCompress.c_str(), bytesUsed, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 
   // "Send" the inputs to yourself
   receiveInputs(&peerInputDataList);

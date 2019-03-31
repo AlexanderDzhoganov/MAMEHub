@@ -192,9 +192,6 @@ Server::Server(string username, int _port, int _unmeasuredNoise, bool _rollback)
 Server::~Server() {}
 
 void Server::shutdown() {
-  // Be nice and let the server know we quit.
-  rakInterface->Shutdown(300);
-
   // We're done with the network
   RakNet::RakPeerInterface::DestroyInstance(rakInterface);
 }
@@ -284,9 +281,7 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
   strcpy((char *)tmpbuf, peerData[assignID].name.c_str());
   tmpbuf +=
       peerData[assignID].name.length() + 1; // add 1 so we get the \0 at the end
-  rakInterface->Send(buf, int(tmpbuf - buf), IMMEDIATE_PRIORITY,
-                     RELIABLE_ORDERED, ORDERING_CHANNEL_SYNC,
-                     RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+  rakInterface->Send(buf, int(tmpbuf - buf), RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 
   // Perform initial sync with player
   initialSync(guidToAccept, machine);
@@ -346,27 +341,6 @@ void Server::removePeer(RakNet::RakNetGUID guid, running_machine *machine) {
 }
 
 bool Server::initializeConnection() {
-  RakNet::SocketDescriptor sd(0, 0);
-  printf("PORT: %d\n", port);
-  sd.port = port;
-  RakNet::StartupResult retval = rakInterface->Startup(512, &sd, 1);
-  /*rakInterface->SetMaximumIncomingConnections(512);
-  rakInterface->SetIncomingPassword("MAME", (int)strlen("MAME"));
-  rakInterface->SetTimeoutTime(5000, RakNet::UNASSIGNED_SYSTEM_ADDRESS);
-  rakInterface->SetOccasionalPing(true);
-  rakInterface->SetUnreliableTimeout(1000);*/
-
-  if (retval != RakNet::RAKNET_STARTED) {
-    printf("Server failed to start. Terminating\n");
-    return false;
-  }
-
-  /*DataStructures::List<RakNet::RakNetSocket2 *> sockets;
-  rakInterface->GetSockets(sockets);
-  printf("Ports used by RakNet:\n");
-  for (unsigned int i = 0; i < sockets.Size(); i++) {
-    printf("%i. %i\n", i + 1, sockets[i]->GetBoundAddress().GetPort());
-  }*/
   return true;
 }
 
@@ -515,12 +489,12 @@ void Server::initialSync(const RakNet::RakNetGUID &guid,
                             8 * packetSize);
     sizeRemaining -= packetSize;
     offset += packetSize;
-    rakInterface->Send(&bitStreamPart, IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                       ORDERING_CHANNEL_SYNC, guid, false);
+    rakInterface->Send(&bitStreamPart, guid, false);
     machine->ui().update_and_render(&machine->render().ui_container());
     machine->osd().update(false);
     RakSleep(0);
   }
+
   {
     RakNet::BitStream bitStreamPart(packetSize + 32);
     unsigned char header = ID_INITIAL_SYNC_COMPLETE;
@@ -528,8 +502,7 @@ void Server::initialSync(const RakNet::RakNetGUID &guid,
                             8 * sizeof(unsigned char));
     bitStreamPart.WriteBits((const unsigned char *)(s.c_str() + offset),
                             8 * sizeRemaining);
-    rakInterface->Send(&bitStreamPart, IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                       ORDERING_CHANNEL_SYNC, guid, false);
+    rakInterface->Send(&bitStreamPart, guid, false);
     machine->ui().update_and_render(&machine->render().ui_container());
     machine->osd().update(false);
     RakSleep(0);
@@ -552,64 +525,7 @@ nsm::PeerInputData Server::popInput(int peerID) {
   return inputToPop;
 }
 
-void Server::processPotentialCandidates(running_machine *machine) {
-  if (potentialCandidates.size() == 0) {
-    return;
-  }
-
-  if (syncCount < 1 || syncPacketQueue.size()) {
-    cout << "IN THE MIDDLE OF A SYNC, HAVE TO DELAY ACCEPTING CLIENT\n";
-    return;
-  }
-
-  for (int a = 0; a < potentialCandidates.size(); a++) {
-    RakNet::SystemAddress systemAddress = potentialCandidates[a].systemAddress;
-    RakNet::RakNetGUID guid = potentialCandidates[a].guid;
-    std::string name = potentialCandidates[a].name;
-
-    // This client is requesting candidacy, set their info
-    { candidateNames[guid] = name; }
-
-    // Find a session index for the player
-    {
-      char buf[4096];
-      buf[0] = ID_SETTINGS;
-      buf[1] = ((syncCount <= 1) ? 0 : 1); // Should the client catch up?
-      memcpy(buf + 2, &secondsBetweenSync, sizeof(int));
-      memcpy(buf + 2 + sizeof(int), &unmeasuredNoise, sizeof(int));
-      strcpy(buf + 2 + (2 * sizeof(int)), username.c_str());
-      rakInterface->Send(buf, 2 + (2 * sizeof(int)) + username.length() + 1,
-                         IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                         ORDERING_CHANNEL_SYNC, guid, false);
-    }
-    if (acceptedPeers.size() >= maxPeerID - 1) {
-      // Sorry, no room
-      rakInterface->CloseConnection(guid, true);
-    } else if (acceptedPeers.size()) {
-      printf("Asking other peers to accept %s\n", guid.ToString());
-      waitingForAcceptFrom[guid] = std::vector<RakNet::RakNetGUID>();
-      for (int a = 0; a < acceptedPeers.size(); a++) {
-        RakNet::RakNetGUID acceptedGuid = acceptedPeers[a];
-        waitingForAcceptFrom[guid].push_back(acceptedGuid);
-        cout << "SENDING ADVERTIZE TO " << acceptedGuid.ToString() << endl;
-        char buf[4096];
-        buf[0] = ID_ADVERTISE_SYSTEM;
-        strcpy(buf + 1, systemAddress.ToString(true));
-        rakInterface->Send(buf, 1 + strlen(systemAddress.ToString(true)) + 1,
-                           IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                           ORDERING_CHANNEL_SYNC, acceptedGuid, false);
-      }
-      printf("Asking other peers to accept\n");
-    } else {
-      // First client, automatically accept
-      acceptPeer(guid, machine);
-    }
-  }
-  potentialCandidates.clear();
-}
-
 bool Server::update(running_machine *machine) {
-  processPotentialCandidates(machine);
   // cout << "SERVER TIME: " << RakNet::GetTimeMS()/1000.0f/60.0f << endl;
   // printf("Updating server\n");
 
@@ -627,22 +543,12 @@ bool Server::update(running_machine *machine) {
 
     // Check if this is a network message packet
     switch (packetIdentifier) {
-    case ID_CONNECTION_LOST:
-      // Couldn't deliver a reliable packet - i.e. the other system was
-      // abnormally terminated
     case ID_DISCONNECTION_NOTIFICATION:
       // Connection lost normally
       printf("ID_DISCONNECTION_NOTIFICATION from %s\n",
              p->systemAddress.ToString(true));
       removePeer(p->guid, machine);
       break;
-
-    case ID_NEW_INCOMING_CONNECTION:
-      // Somebody connected.  We have their IP now
-      printf("ID_NEW_INCOMING_CONNECTION from %s with GUID %s\n",
-             p->systemAddress.ToString(true), p->guid.ToString());
-      break;
-
     case ID_CLIENT_INFO:
       cout << "GOT ID_CLIENT_INFO\n";
       if (blockNewClients) {
@@ -652,56 +558,19 @@ bool Server::update(running_machine *machine) {
         break;
       }
 
+      candidateNames[p->guid] = "player";
+      acceptPeer(p->guid, machine);
+
       {
         char buf[4096];
-        strcpy(buf, (char *)(p->data + 1));
-        potentialCandidates.push_back(
-            NameGuidAddressTriple(buf, p->guid, p->systemAddress));
+        buf[0] = ID_SETTINGS;
+        buf[1] = ((syncCount <= 1) ? 0 : 1); // Should the client catch up?
+        memcpy(buf + 2, &secondsBetweenSync, sizeof(int));
+        memcpy(buf + 2 + sizeof(int), &unmeasuredNoise, sizeof(int));
+        strcpy(buf + 2 + (2 * sizeof(int)), username.c_str());
+        rakInterface->Send(buf, 2 + (2 * sizeof(int)) + username.length() + 1, p->guid, false);
       }
       break;
-
-    case ID_INCOMPATIBLE_PROTOCOL_VERSION:
-      printf("ID_INCOMPATIBLE_PROTOCOL_VERSION\n");
-      break;
-
-    case ID_ACCEPT_NEW_HOST: {
-      printf("Accepting new host\n");
-      RakNet::RakNetGUID guidToAccept;
-      RakNet::SystemAddress saToAccept;
-      saToAccept.SetBinaryAddress(((char *)p->data) + 1);
-      guidToAccept = rakInterface->GetGuidFromSystemAddress(saToAccept);
-      if (waitingForAcceptFrom.find(guidToAccept) ==
-          waitingForAcceptFrom.end()) {
-        throw std::runtime_error("OOPS");
-      }
-      for (int a = 0; a < waitingForAcceptFrom[guidToAccept].size(); a++) {
-        if (waitingForAcceptFrom[guidToAccept][a] == p->guid) {
-          waitingForAcceptFrom[guidToAccept].erase(
-              waitingForAcceptFrom[guidToAccept].begin() + a);
-          break;
-        }
-      }
-      if (waitingForAcceptFrom[guidToAccept].empty()) {
-        cout << "Accepting: " << guidToAccept.ToString() << endl;
-        waitingForAcceptFrom.erase(waitingForAcceptFrom.find(guidToAccept));
-        acceptPeer(guidToAccept, machine);
-      }
-    } break;
-
-    case ID_REJECT_NEW_HOST: {
-      RakNet::RakNetGUID guidToReject;
-      RakNet::SystemAddress saToReject;
-      saToReject.SetBinaryAddress(((char *)p->data) + 1);
-      guidToReject = rakInterface->GetGuidFromSystemAddress(saToReject);
-      printf("Rejecting new client\n");
-      cout << p->guid.ToString() << " REJECTS " << guidToReject.ToString()
-           << endl;
-      if (waitingForAcceptFrom.find(guidToReject) == waitingForAcceptFrom.end())
-        printf("Could not find waitingForAcceptFrom for this GUID, weird\n");
-      else
-        waitingForAcceptFrom.erase(waitingForAcceptFrom.find(guidToReject));
-      rakInterface->CloseConnection(guidToReject, true);
-    } break;
 
     case ID_INPUTS: {
       string s = doInflate(GetPacketData(p), GetPacketSize(p));
@@ -882,9 +751,7 @@ void Server::popSyncQueue() {
     // TODO: Found memory corruption when waiting to send, either
     // change all of these to immediate or find the corruption.
     rakInterface->Send((const char *)syncPacket.first, syncPacket.second,
-                       IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                       ORDERING_CHANNEL_SYNC, RakNet::UNASSIGNED_SYSTEM_ADDRESS,
-                       true);
+                       RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
   }
 }
 
@@ -893,7 +760,5 @@ void Server::sendBaseDelay(int baseDelay) {
   dataToSend[0] = ID_BASE_DELAY;
   memcpy(dataToSend + 1, &baseDelay, sizeof(int));
   // cout << "SENDING MESSAGE WITH LENGTH: " << intSize << endl;
-  rakInterface->Send(dataToSend, 5, IMMEDIATE_PRIORITY, RELIABLE_ORDERED,
-                     ORDERING_CHANNEL_BASE_DELAY,
-                     RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
+  rakInterface->Send(dataToSend, 5, RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 }
