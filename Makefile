@@ -208,7 +208,7 @@ BUILD_EXPAT = 1
 # BUILD_ZLIB = 1
 
 # uncomment next line to build libflac as part of MAME build
-# BUILD_FLAC = 1
+BUILD_FLAC = 1
 
 # uncomment next line to build jpeglib as part of MAME build
 # BUILD_JPEGLIB = 1
@@ -417,7 +417,6 @@ NATIVE_OBJ = OBJ
 endif # NATIVE_OBJ
 endif # CROSS_BUILD
 
-
 #-------------------------------------------------
 # compile-time definitions
 #-------------------------------------------------
@@ -442,9 +441,6 @@ endif
 #Define _USE_MATH_DEFINES for M_PI
 DEFS += -D_USE_MATH_DEFINES
 
-#Define _RAKNET_LIB for RakNet
-DEFS += -D_RAKNET_LIB
-
 # define NO_MEM_TRACKING for csmame
 DEFS += -DNO_MEM_TRACKING
 
@@ -454,11 +450,6 @@ DEFS += -DINLINE="static inline"
 # define LSB_FIRST if we are a little-endian target
 ifndef BIGENDIAN
 DEFS += -DLSB_FIRST
-endif
-
-# define PTR64 if we are a 64-bit target
-ifeq ($(PTR64),1)
-DEFS += -DPTR64
 endif
 
 # define MAME_DEBUG if we are a debugging build
@@ -512,7 +503,7 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 # we compile C-only to C89 standard with GNU extensions
 # we compile C++ code to C++98 standard with GNU extensions
 
-EMFLAGS=-s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
+EMFLAGS = -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -s EMULATE_FUNCTION_POINTER_CASTS=1
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
 EMFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-deprecated-register -Wno-c++11-narrowing
 
@@ -740,13 +731,15 @@ LIBS += -lexpat
 EXPAT =
 endif
 
-# add jpeglib image library
-ifeq ($(BUILD_JPEGLIB),1)
-INCPATH += -I$(3RDPARTY)/libjpeg
-JPEG_LIB = $(OBJ)/libjpeg.bc
+# add flac library
+ifeq ($(BUILD_FLAC),1)
+INCPATH += -I$(SRC)/lib/util
+FLAC_LIB = $(OBJ)/libflac.bc
+# $(OBJ)/libflac++.a
 else
-LIBS += -ljpeg
-JPEG_LIB =
+LIBS += -lFLAC
+BASELIBS += -lFLAC
+FLAC_LIB =
 endif
 
 # add SoftFloat floating point emulation library
@@ -888,7 +881,7 @@ ifeq ($(BUSES),)
 LIBBUS =
 endif
 
-EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(SOFTFLOAT) $(JPEG_LIB) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(LUA_LIB) $(SQLITE3_LIB) $(WEB_LIB) $(BGFX_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
+EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(FLAC_LIB) $(SOFTFLOAT) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
 
 ifeq ($(TARGETOS),emscripten)
 EMULATOROBJ = $(EMULATOROBJLIST:.a=.bc)
@@ -917,8 +910,6 @@ endif
 endif
 
 endif
-
-
 
 #-------------------------------------------------
 # generic rules
