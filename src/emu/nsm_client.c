@@ -147,17 +147,14 @@ int initialSyncPercentComplete = 0;
 extern bool waitingForClientCatchup;
 extern int baseDelayFromPing;
 extern attotime mostRecentSentReport;
-int doCatchup = 0;
 RakNet::Time largestPacketTime = 0;
 
 bool Client::initializeConnection(running_machine *machine) {
   isConnecting = true;
-  
-  {
-    char buf[4096];
-    buf[0] = ID_CLIENT_HANDSHAKE;
-    rakInterface->Send(buf, 1);
-  }
+
+  char buf[1];
+  buf[0] = ID_CLIENT_HANDSHAKE;
+  rakInterface->Send(buf, 1);
 
   return true;
 
@@ -323,45 +320,43 @@ void Client::loadInitialData(unsigned char *data, int size,
 }
 
 void Client::createInitialBlocks(running_machine *machine) {
+  std::cout << "Client::createInitialBlocks" << std::endl;
+  
   unsigned char checksum = 0;
 
   machine->save().dispatch_presave();
 
-  if (getSecondsBetweenSync()) {
-    // Server and client must match on blocks
-    if (blocks.size() != initial_sync.initial_block_size()) {
-      cout << "ERROR: CLIENT AND SERVER BLOCK COUNTS DO NOT MATCH!\n";
+  // Server and client must match on blocks
+  if (blocks.size() != initial_sync.initial_block_size()) {
+    cout << "ERROR: CLIENT AND SERVER BLOCK COUNTS DO NOT MATCH!\n";
+    exit(1);
+  }
+
+  for (int blockIndex = 0; blockIndex < initial_sync.initial_block_size();
+        blockIndex++) {
+    if (initial_sync.initial_block(blockIndex).length() !=
+        blocks[blockIndex]->size) {
+      cout << "ERROR: CLIENT AND SERVER BLOCK SIZES AT INDEX " << blockIndex
+            << " DO NOT MATCH!\n";
+      cout << initial_sync.initial_block(blockIndex).length()
+            << " != " << blocks[blockIndex]->size << endl;
       exit(1);
     }
 
-    for (int blockIndex = 0; blockIndex < initial_sync.initial_block_size();
-         blockIndex++) {
-      if (initial_sync.initial_block(blockIndex).length() !=
-          blocks[blockIndex]->size) {
-        cout << "ERROR: CLIENT AND SERVER BLOCK SIZES AT INDEX " << blockIndex
-             << " DO NOT MATCH!\n";
-        cout << initial_sync.initial_block(blockIndex).length()
-             << " != " << blocks[blockIndex]->size << endl;
-        exit(1);
-      }
-
-      // initialSyncStream.ReadBits(staleBlocks[blockIndex]->data,blockSize*8);
-
-      // cout << "BLOCK " << blockIndex << ":\n";
-      for (int a = 0; a < blocks[blockIndex]->size; a++) {
-        unsigned char xorValue = initial_sync.initial_block(blockIndex)[a];
-        // cout << int(blocks[blockIndex]->data[a] ^ xorValue) << '\n';
-        staleBlocks[blockIndex]->data[a] =
-            blocks[blockIndex]->data[a] ^ xorValue;
-        checksum = checksum ^ staleBlocks[blockIndex]->data[a];
-      }
-      if (checksum != initial_sync.checksum(blockIndex)) {
-        cout << "CHECKSUM ERROR: " << int(checksum)
-             << " != " << int(initial_sync.checksum(blockIndex)) << " "
-             << blocks[blockIndex]->name << " (index: " << blockIndex << ") "
-             << endl;
-        exit(1);
-      }
+    // cout << "BLOCK " << blockIndex << ":\n";
+    for (int a = 0; a < blocks[blockIndex]->size; a++) {
+      unsigned char xorValue = initial_sync.initial_block(blockIndex)[a];
+      // cout << int(blocks[blockIndex]->data[a] ^ xorValue) << '\n';
+      staleBlocks[blockIndex]->data[a] =
+          blocks[blockIndex]->data[a] ^ xorValue;
+      checksum = checksum ^ staleBlocks[blockIndex]->data[a];
+    }
+    if (checksum != initial_sync.checksum(blockIndex)) {
+      cout << "CHECKSUM ERROR: " << int(checksum)
+            << " != " << int(initial_sync.checksum(blockIndex)) << " "
+            << blocks[blockIndex]->name << " (index: " << blockIndex << ") "
+            << endl;
+      exit(1);
     }
   }
 

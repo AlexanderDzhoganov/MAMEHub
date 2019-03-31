@@ -661,8 +661,8 @@ void device_scheduler::timed_trigger(void *ptr, INT32 param)
 void device_scheduler::presave()
 {
 	// report the timer state after a log
-	logerror("Prior to saving state:\n");
-	dump_timers();
+	// logerror("Prior to saving state:\n");
+	// dump_timers();
 }
 
 
@@ -696,8 +696,8 @@ void device_scheduler::postload()
 	rebuild_execute_list();
 
 	// report the timer state after a log
-	logerror("After resetting/reordering timers:\n");
-	dump_timers();
+	// logerror("After resetting/reordering timers:\n");
+	// dump_timers();
 }
 
 

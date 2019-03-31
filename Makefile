@@ -208,7 +208,7 @@ BUILD_EXPAT = 1
 # BUILD_ZLIB = 1
 
 # uncomment next line to build libflac as part of MAME build
-BUILD_FLAC = 1
+# BUILD_FLAC = 1
 
 # uncomment next line to build jpeglib as part of MAME build
 # BUILD_JPEGLIB = 1
@@ -512,7 +512,7 @@ CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 # we compile C-only to C89 standard with GNU extensions
 # we compile C++ code to C++98 standard with GNU extensions
 
-EMFLAGS=-s ALLOW_MEMORY_GROWTH -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
+EMFLAGS=-s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
 EMFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-deprecated-register -Wno-c++11-narrowing
 
@@ -740,17 +740,6 @@ LIBS += -lexpat
 EXPAT =
 endif
 
-# add flac library
-ifeq ($(BUILD_FLAC),1)
-INCPATH += -I$(SRC)/lib/util
-FLAC_LIB = $(OBJ)/libflac.bc
-# $(OBJ)/libflac++.a
-else
-LIBS += -lFLAC
-BASELIBS += -lFLAC
-FLAC_LIB =
-endif
-
 # add jpeglib image library
 ifeq ($(BUILD_JPEGLIB),1)
 INCPATH += -I$(3RDPARTY)/libjpeg
@@ -899,7 +888,7 @@ ifeq ($(BUSES),)
 LIBBUS =
 endif
 
-EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(SOFTFLOAT) $(JPEG_LIB) $(FLAC_LIB) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(LUA_LIB) $(SQLITE3_LIB) $(WEB_LIB) $(BGFX_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
+EMULATOROBJLIST = $(EMUINFOOBJ) $(DRIVLISTOBJ) $(DRVLIBS) $(LIBOSD) $(LIBBUS) $(LIBOPTIONAL) $(LIBEMU) $(LIBDASM) $(LIBUTIL) $(EXPAT) $(SOFTFLOAT) $(JPEG_LIB) $(PROTOBUF) $(7Z_LIB) $(FORMATS_LIB) $(LUA_LIB) $(SQLITE3_LIB) $(WEB_LIB) $(BGFX_LIB) $(ZLIB) $(LIBOCORE) $(MIDI_LIB) $(RESFILE)
 
 ifeq ($(TARGETOS),emscripten)
 EMULATOROBJ = $(EMULATOROBJLIST:.a=.bc)

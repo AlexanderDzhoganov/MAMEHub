@@ -337,7 +337,6 @@ device_t &running_machine::add_dynamic_device(device_t &owner, device_type type,
 }
 
 extern char CORE_SEARCH_PATH[4096];
-extern int doCatchup;
 bool catchingUp = false;
 
 bool doRollback = false;
@@ -475,7 +474,7 @@ vector<int> peerIDs;
 
 bool running_machine::mainLoop()
 {
-  if (netClient && !netClient->initComplete)
+  /*if (netClient && !netClient->initComplete)
   {
     if(!netCommon->update(this))
     {
@@ -486,7 +485,7 @@ bool running_machine::mainLoop()
     // ui().update_and_render(&(render().ui_container()));
     // osd().update(false);
     return false;
-  }
+  }*/
 
   attotime timeBefore = m_scheduler.time();
   attotime machineTimeBefore = machine_time();
@@ -568,12 +567,13 @@ bool running_machine::mainLoop()
     {
       // Initial sync
       netServer->sync(this);
+      // nvram_save(); // TODO FIXME necessary?
     }
 
     if (netClient)
     {
       // Load initial data
-      netClient->createInitialBlocks(this);
+      netClient->createInitialBlocks(this); // TODO FIXME, why was this called here?
     }
   }
   else if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed)
@@ -595,7 +595,7 @@ bool running_machine::mainLoop()
       else
       {
         netServer->sync(this);
-        //nvram_save(*this);
+        // nvram_save();
         cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << machine_time().seconds << '.' << machine_time().attoseconds << endl;
       }
     }
@@ -762,26 +762,6 @@ int running_machine::run(bool firstrun)
     }
   }
 
-  if(netClient)
-  {
-    /* specify the filename to save or load */
-    //set_saveload_filename(machine, "1");
-    //handle_load(machine);
-    //if(netClient->getSecondsBetweenSync())
-    //doPreSave(this);
-
-    if(!netClient->initializeConnection(this))
-    {
-      exit(MAMERR_NETWORK);
-    }
-
-    printf("LOADED CLIENT\n");
-    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
-    
-    //if(netClient->getSecondsBetweenSync())
-    //doPostLoad(this);
-  }
-
   // disallow save state registrations starting here.
   // Don't do it earlier, config load can create network
   // devices with timers.
@@ -798,6 +778,17 @@ int running_machine::run(bool firstrun)
 
   // perform a soft reset -- this takes us to the running phase
   soft_reset();
+
+  if(netClient)
+  {
+    if(!netClient->initializeConnection(this))
+    {
+      exit(MAMERR_NETWORK);
+    }
+
+    printf("LOADED CLIENT\n");
+    cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
+  }
 
 #ifdef MAME_DEBUG
   g_tagmap_finds = 0;
@@ -1603,16 +1594,27 @@ void running_machine::stop_all_devices()
 
 void running_machine::presave_all_devices()
 {
+  std::cout << "running_machine::presave_all_devices" << std::endl;
+  std::cout.flush();
+
   device_iterator iter(root_device());
+
   for (device_t *device = iter.first(); device != NULL; device = iter.next())
   {
     if (device == NULL)
     {
       std::cout << "DEVICE IS NULL" << std::endl;
       std::cout.flush();
+      continue;
     }
 
+    std::cout << "PRESAVING DEVICE: " << device->name() << std::endl;
+    std::cout.flush();
+
     device->pre_save();
+
+    std::cout << "DONE PRESAVING DEVICE: " << device->name() << std::endl;
+    std::cout.flush();
   }
 }
 

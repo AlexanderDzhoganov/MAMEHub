@@ -306,9 +306,6 @@ bool Server::initializeConnection() {
 vector<boost::shared_ptr<MemoryBlock> >
 Server::createMemoryBlock(const std::string &name, unsigned char *ptr,
                           int size) {
-  if (blocks.size() == 39) {
-    // throw ("OOPS");
-  }
   vector<boost::shared_ptr<MemoryBlock> > retval;
   const int BYTES_IN_MB = 1024 * 1024;
   if (size > BYTES_IN_MB) {
@@ -330,9 +327,9 @@ Server::createMemoryBlock(const std::string &name, unsigned char *ptr,
   blocks.push_back(
       boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
   staleBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
+      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
   initialBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
+      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
   retval.push_back(blocks.back());
   return retval;
 }
@@ -378,8 +375,8 @@ void Server::initialSync(const std::string& guid,
     cout << "CHECKSUM: " << int(checksum) << endl;
   }
 
-  waitingForClientCatchup = true;
-  machine->osd().pauseAudio(true);
+  // waitingForClientCatchup = true;
+  // machine->osd().pauseAudio(true);
 
   for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
        it++) {
@@ -418,6 +415,9 @@ void Server::initialSync(const std::string& guid,
         cout << "ADDING NVRAM OF SIZE: " << file.size() << " "
              << file.filename() << endl;
         file.close();
+      }
+      else {
+        cout << "FAILED TO WRITE NVRAM" << endl;
       }
     }
   }
@@ -526,10 +526,8 @@ void Server::sync(running_machine *machine)
 {
   cout << "SYNCING (count): " << syncCount << endl;
 
-  /*if (syncCount>0)
-  {
-    machine->save().dispatch_presave();
-  }*/
+  machine->save().dispatch_presave();
+
   if (syncOverride)
   {
     return;
@@ -621,21 +619,18 @@ void Server::sync(running_machine *machine)
   printf("XOR CHECKSUM: %d\n", int(xorChecksum));
   printf("STALE CHECKSUM (dirty): %d\n", int(staleChecksum));
   printf("STALE CHECKSUM (all): %d\n", int(allStaleChecksum));
+  
   // The first sync is not sent to clients
-  if (syncCount > 0)
+  //if (syncCount > 0)
   {
     syncProcessor = std::shared_ptr<SyncProcessor>(new SyncProcessor(
         &syncProto, &syncPacketQueue, syncTransferSeconds, &syncReady));
   }
 
-  // if(runTimes%1==0) cout << "BYTES SYNCED: " << bytesSynched << endl;
   cout << "OUT OF CRITICAL AREA\n";
   cout.flush();
 
-  /*if (syncCount>0)
-  {
-    machine->save().dispatch_postload();
-  }*/
+  machine->save().dispatch_postload();
 
   {
     unsigned char blockChecksum = 0;
