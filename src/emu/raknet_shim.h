@@ -12,7 +12,6 @@
 enum
 {
   ID_TIMESTAMP = 0,
-  ID_DISCONNECTION_NOTIFICATION,
   ID_USER_PACKET_ENUM
 };
 
@@ -270,16 +269,16 @@ namespace RakNet
       }
     }
     
-    void Send(const char* data, int length, RakNetGUID guid, bool broadcast = false);
+    void Send(const char* data, int length, SystemAddress address, bool broadcast = false);
 
-    void RakPeerInterface::Send(const char* data, int length, RakNetGUID guid, bool broadcast)
+    void Send(const char* data, int length, RakNetGUID guid, bool broadcast = false)
     {
       return Send(data, length, GetSystemAddressFromGuid(guid), broadcast);
     }
 
-    void RakPeerInterface::Send(const BitStream* stream, RakNetGUID guid, bool broadcast)
+    void Send(const BitStream* stream, RakNetGUID guid, bool broadcast = false)
     {
-      return Send(stream->data, stream->dataPtr, GetSystemAddressFromGuid(guid, broadcast);
+      return Send(stream->data, stream->dataPtr, GetSystemAddressFromGuid(guid), broadcast);
     }
 
     Packet* Receive();

@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <iostream>
+#include <deque>
 
 #include <emscripten/emscripten.h>
 #include "raknet_shim.h"
@@ -14,8 +15,8 @@ struct JSPacket
   unsigned int address;
 };
 
-std::vector<JSPacket> sendQueue;
-std::vector<JSPacket> recvQueue;
+std::deque<JSPacket> sendQueue;
+std::deque<JSPacket> recvQueue;
 
 #define MAX_PACKET_SIZE 65535
 
@@ -35,13 +36,13 @@ extern "C" {
       return 0;
     }
 
-    JSPacket& packet = sendQueue.back();
+    JSPacket& packet = sendQueue.front();
 
     memcpy(data, packet.data.data(), packet.data.size() * sizeof(char));
     metadata[0] = (int)packet.data.size();
     metadata[1] = packet.address;
 
-    sendQueue.pop_back();
+    sendQueue.pop_front();
 
     return 1;
   }
@@ -63,14 +64,14 @@ Packet* RakPeerInterface::Receive()
     return NULL;
   }
 
-  JSPacket js_packet = recvQueue.back();
-  recvQueue.pop_back();
+  JSPacket js_packet = recvQueue.front();
+  recvQueue.pop_front();
 
   Packet* packet = new Packet();
   packet->guid = js_packet.address;
   packet->systemAddress = js_packet.address;
   packet->length = js_packet.data.size();
-  packet->data = new unsigned char[js_packet.data.size()];
+  packet->data = new char[js_packet.data.size()];
   memcpy(packet->data, js_packet.data.data(), js_packet.data.size() * sizeof(char));
 
   return packet;

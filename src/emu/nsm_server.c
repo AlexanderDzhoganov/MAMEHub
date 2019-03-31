@@ -283,6 +283,16 @@ void Server::acceptPeer(RakNet::RakNetGUID guidToAccept,
       peerData[assignID].name.length() + 1; // add 1 so we get the \0 at the end
   rakInterface->Send(buf, int(tmpbuf - buf), RakNet::UNASSIGNED_SYSTEM_ADDRESS, true);
 
+  /*{
+    char buf[4096];
+    buf[0] = ID_SETTINGS;
+    buf[1] = ((syncCount <= 1) ? 0 : 1); // Should the client catch up?
+    memcpy(buf + 2, &secondsBetweenSync, sizeof(int));
+    memcpy(buf + 2 + sizeof(int), &unmeasuredNoise, sizeof(int));
+    strcpy(buf + 2 + (2 * sizeof(int)), username.c_str());
+    rakInterface->Send(buf, 2 + (2 * sizeof(int)) + username.length() + 1, p->guid, false);
+  }*/
+
   // Perform initial sync with player
   initialSync(guidToAccept, machine);
 }
@@ -543,14 +553,9 @@ bool Server::update(running_machine *machine) {
 
     // Check if this is a network message packet
     switch (packetIdentifier) {
-    case ID_DISCONNECTION_NOTIFICATION:
-      // Connection lost normally
-      printf("ID_DISCONNECTION_NOTIFICATION from %s\n",
-             p->systemAddress.ToString(true));
-      removePeer(p->guid, machine);
-      break;
     case ID_CLIENT_INFO:
       cout << "GOT ID_CLIENT_INFO\n";
+      
       if (blockNewClients) {
         cout << "NOT ACCEPTING NEW CLIENTS\n";
         // We aren't allowing new clients
@@ -560,16 +565,6 @@ bool Server::update(running_machine *machine) {
 
       candidateNames[p->guid] = "player";
       acceptPeer(p->guid, machine);
-
-      {
-        char buf[4096];
-        buf[0] = ID_SETTINGS;
-        buf[1] = ((syncCount <= 1) ? 0 : 1); // Should the client catch up?
-        memcpy(buf + 2, &secondsBetweenSync, sizeof(int));
-        memcpy(buf + 2 + sizeof(int), &unmeasuredNoise, sizeof(int));
-        strcpy(buf + 2 + (2 * sizeof(int)), username.c_str());
-        rakInterface->Send(buf, 2 + (2 * sizeof(int)) + username.length() + 1, p->guid, false);
-      }
       break;
 
     case ID_INPUTS: {
@@ -583,6 +578,8 @@ bool Server::update(running_machine *machine) {
       printf("UNEXPECTED PACKET ID: %d\n", int(packetIdentifier));
       break;
     }
+
+    rakInterface->DeallocatePacket(p);
   }
 
   return true;

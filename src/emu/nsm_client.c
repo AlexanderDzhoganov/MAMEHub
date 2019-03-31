@@ -151,28 +151,24 @@ extern bool waitingForClientCatchup;
 extern int baseDelayFromPing;
 extern attotime mostRecentSentReport;
 int doCatchup = 0;
-RakNet::RakNetGUID masterGuid;
+RakNet::RakNetGUID masterGuid(0);
 RakNet::Time largestPacketTime = 0;
 
 bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
                                   unsigned short port,
                                   running_machine *machine) {
-  RakNet::SystemAddress sa = ConnectBlocking(hostname, port, true);
-  if (sa == RakNet::UNASSIGNED_SYSTEM_ADDRESS) {
-    printf("Could not connect to server!\n");
-    return false;
-  }
-  RakNet::RakNetGUID guid = rakInterface->GetGuidFromSystemAddress(sa);
-  masterGuid = guid;
-
+  isConnecting = true;
+  
   {
     char buf[4096];
     buf[0] = ID_CLIENT_INFO;
     strcpy(buf + 1, username.c_str());
-    rakInterface->Send(buf, 1 + username.length() + 1, sa, false);
+    rakInterface->Send(buf, 1 + username.length() + 1, RakNet::UNASSIGNED_SYSTEM_ADDRESS, false);
   }
 
-  peerIDs[guid] = 1;
+  return true;
+
+  // peerIDs[guid] = 1;
 
   while (initComplete == false) {
     RakNet::Packet *p = rakInterface->Receive();
@@ -188,7 +184,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
 
     switch (packetID) {
     case ID_HOST_ACCEPTED: {
-      unsigned char *dataPtr = p->data + 1;
+      /*unsigned char *dataPtr = p->data + 1;
       int peerID;
       memcpy(&peerID, dataPtr, sizeof(int));
       dataPtr += sizeof(int);
@@ -229,32 +225,14 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
         waitingForClientCatchup = true;
         machine->osd().pauseAudio(true);
       }
-      upsertPeer(guid, peerID, buf, startTime);
-    } break;
-
-    case ID_INITIAL_SYNC_PARTIAL: {
-      // printf("GOT PARTIAL SYNC FROM SERVER\n");
-      int curPos = (int)initialSyncBuffer.size();
-      initialSyncBuffer.resize(initialSyncBuffer.size() + GetPacketSize(p));
-      memcpy(&initialSyncBuffer[curPos], GetPacketData(p), GetPacketSize(p));
-
-      int totalSize;
-      memcpy(&totalSize, (&initialSyncBuffer[sizeof(int)]), sizeof(int));
-      initialSyncPercentComplete = initialSyncBuffer.size() * 1000 / totalSize;
-    } break;
-    case ID_INITIAL_SYNC_COMPLETE: {
-      printf("GOT INITIAL SYNC FROM SERVER!\n");
-      int curPos = (int)initialSyncBuffer.size();
-      initialSyncBuffer.resize(initialSyncBuffer.size() + GetPacketSize(p));
-      memcpy(&initialSyncBuffer[curPos], GetPacketData(p), GetPacketSize(p));
-      loadInitialData(&initialSyncBuffer[0], (int)initialSyncBuffer.size(),
-                      machine);
-      initComplete = true;
+      upsertPeer(guid, peerID, buf, startTime);*/
     } break;
     case ID_INPUTS: {
       if (initComplete)
         throw emu_fatalerror("GOT INPUT BEFORE INIT COMPLETE");
-      if (p->guid == masterGuid) {
+
+      // if (p->guid == masterGuid)
+      {
         // Inputs from server.  Record time if it's newer
         RakNet::BitStream timeBS((unsigned char *)&(p->data[1]),
                                  sizeof(RakNet::Time), false);
@@ -266,6 +244,7 @@ bool Client::initializeConnection(unsigned short selfPort, const char *hostname,
           largestPacketTime = packetTime;
         }
       }
+
       string s = doInflate(GetPacketData(p), GetPacketSize(p));
       PeerInputDataList inputDataList;
       inputDataList.ParseFromString(s);
@@ -444,38 +423,19 @@ bool Client::update(running_machine *machine) {
     printWhenCheck = false;
     // printf("Checking for packets\n");
   }
-  
-  bool inNegotiation = false;
 
-  do {
+  while (true) {
     RakNet::Packet *p = rakInterface->Receive();
     if (!p) {
-      if (inNegotiation) {
-        continue;
-      } else {
-        break;
-      }
+      break;
     }
+
     unsigned char packetID = GetPacketIdentifier(p);
     // cout << "GOT PACKET WITH ID: " << packetID << endl;
 
     switch (packetID) {
-    case ID_DISCONNECTION_NOTIFICATION:
-      // Connection lost normally
-      printf("ID_DISCONNECTION_NOTIFICATION\n");
-      if (peerIDs.find(p->guid) != peerIDs.end()) {
-        if (peerIDs[p->guid] == 1) {
-          // Server quit, we are done.
-          return false;
-        } else {
-          if (peerData.find(peerIDs[p->guid]) != peerData.end())
-            peerData.erase(peerIDs[p->guid]);
-          peerIDs.erase(p->guid);
-        }
-      }
-      break;
     case ID_HOST_ACCEPTED: {
-      inNegotiation = false;
+      isConnecting = false;
       unsigned char *tmpbuf = p->data + 1;
       int peerID;
       memcpy(&peerID, tmpbuf, sizeof(int));
@@ -508,7 +468,25 @@ bool Client::update(running_machine *machine) {
       }
       upsertPeer(guid, peerID, buf, startTime);
     } break;
+    case ID_INITIAL_SYNC_PARTIAL: {
+      // printf("GOT PARTIAL SYNC FROM SERVER\n");
+      int curPos = (int)initialSyncBuffer.size();
+      initialSyncBuffer.resize(initialSyncBuffer.size() + GetPacketSize(p));
+      memcpy(&initialSyncBuffer[curPos], GetPacketData(p), GetPacketSize(p));
 
+      int totalSize;
+      memcpy(&totalSize, (&initialSyncBuffer[sizeof(int)]), sizeof(int));
+      initialSyncPercentComplete = initialSyncBuffer.size() * 1000 / totalSize;
+    } break;
+    case ID_INITIAL_SYNC_COMPLETE: {
+      printf("GOT INITIAL SYNC FROM SERVER!\n");
+      int curPos = (int)initialSyncBuffer.size();
+      initialSyncBuffer.resize(initialSyncBuffer.size() + GetPacketSize(p));
+      memcpy(&initialSyncBuffer[curPos], GetPacketData(p), GetPacketSize(p));
+      loadInitialData(&initialSyncBuffer[0], (int)initialSyncBuffer.size(),
+                      machine);
+      initComplete = true;
+    } break;
     case ID_RESYNC_PARTIAL: {
       printf("GOT PARTIAL RESYNC\n");
       if (hasCompleteResync) {
@@ -562,7 +540,9 @@ bool Client::update(running_machine *machine) {
         throw std::runtime_error(
             "OLD VERSION OF MAMEHUB TRYING TO TALK TO NEW VERSION");
       }
-      if (p->guid == masterGuid) {
+
+      //if (p->guid == masterGuid)
+      {
         // Inputs from server.  Record time if it's newer
         RakNet::BitStream timeBS((unsigned char *)&(p->data[1]),
                                  sizeof(RakNet::Time), false);
@@ -595,7 +575,7 @@ bool Client::update(running_machine *machine) {
     }
 
     rakInterface->DeallocatePacket(p);
-  } while (true);
+  }
 
   return true;
 }

@@ -15,8 +15,6 @@ protected:
   std::vector<boost::shared_ptr<MemoryBlock> > syncCheckBlocks;
   std::vector<unsigned char> incomingMsg;
 
-  bool initComplete;
-
   unsigned char *syncPtr;
 
   bool firstResync;
@@ -28,6 +26,9 @@ protected:
   long long syncAttoseconds;
 
 public:
+  bool isConnecting;
+  bool initComplete;
+
   Client(std::string _username);
 
   void shutdown();

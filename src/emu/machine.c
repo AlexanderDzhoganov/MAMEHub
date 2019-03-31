@@ -478,6 +478,18 @@ void running_machine::mainLoop()
   attotime timeBefore = m_scheduler.time();
   attotime machineTimeBefore = machine_time();
 
+  if (netClient && !netClient->initComplete)
+  {
+    if(!netCommon->update(this))
+    {
+      cout << "NETWORK FAILED\n";
+      ::exit(1);
+    }
+
+    m_video->frame_update();
+    return;
+  }
+
   if (!m_paused)
   {
     // execute CPUs if not paused
@@ -528,7 +540,7 @@ void running_machine::mainLoop()
 
       netCommon->getPeerIDs(peerIDs);
       
-      for (int a = 0; a<peerIDs.size(); a++)
+      for (int a = 0; a < peerIDs.size(); a++)
       {
         while(true)
         {
