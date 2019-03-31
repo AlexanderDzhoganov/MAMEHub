@@ -523,6 +523,10 @@ bool Client::update(running_machine *machine) {
       break;
     }
     case ID_INPUTS: {
+      if (!initComplete) {
+        break; // TODO FIXME, not sure what to do with these
+      }
+
       if (peerIDs.find(p->sender) == peerIDs.end()) {
         throw std::runtime_error("GOT INPUTS FROM UNKNOWN PEER");
       }

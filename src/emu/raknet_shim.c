@@ -19,17 +19,7 @@ struct JSPacket
 std::deque<JSPacket> sendQueue;
 std::deque<JSPacket> recvQueue;
 
-#define MAX_PACKET_SIZE 65535
-
 extern "C" {
-  void jsArrayTest(char* array)
-  {
-    array[0] = 3;
-    array[1] = 1;
-    array[2] = 4;
-    array[3] = 5;
-  }
-
   int jsGetNextPacket(char* data, char* recipient)
   {
     if (sendQueue.empty())
@@ -101,7 +91,7 @@ void RakPeerInterface::Send(const char* data, int length, const std::string& pee
 
 void RakSleep(int ms)
 {
-  usleep(ms);
+  // synchronous sleep doesn't make sense in a js context
 }
 
 Time RakNet::GetTimeMS()

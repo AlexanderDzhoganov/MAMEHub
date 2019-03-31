@@ -435,7 +435,7 @@ void Server::initialSync(const std::string& guid,
   }
 
   int sizeRemaining = s.length() + sizeof(int) + sizeof(int);
-  int packetSize = max(256, min(1024, sizeRemaining / 100));
+  int packetSize = min(MAX_PACKET_SIZE, sizeRemaining);
   int offset = 0;
 
   oldInputTime.seconds = oldInputTime.attoseconds = 0;
@@ -450,9 +450,9 @@ void Server::initialSync(const std::string& guid,
     sizeRemaining -= packetSize;
     offset += packetSize;
     rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
-    machine->ui().update_and_render(&machine->render().ui_container());
-    machine->osd().update(false);
-    RakSleep(0);
+    // machine->ui().update_and_render(&machine->render().ui_container());
+    // machine->osd().update(false);
+    // RakSleep(0);
   }
 
   {
@@ -463,9 +463,9 @@ void Server::initialSync(const std::string& guid,
     bitStreamPart.WriteBits((const unsigned char *)(s.c_str() + offset),
                             8 * sizeRemaining);
     rakInterface->Send(bitStreamPart.data, bitStreamPart.dataPtr, guid);
-    machine->ui().update_and_render(&machine->render().ui_container());
-    machine->osd().update(false);
-    RakSleep(0);
+    // machine->ui().update_and_render(&machine->render().ui_container());
+    // machine->osd().update(false);
+    // RakSleep(0);
   }
 
   cout << "FINISHED SENDING BLOCKS TO CLIENT\n";

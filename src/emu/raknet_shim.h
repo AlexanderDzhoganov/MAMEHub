@@ -9,6 +9,8 @@
  * RakNet library shim, calls into JavaScript
  */
 
+#define MAX_PACKET_SIZE 65535
+
 void RakSleep(int time);
 
 namespace RakNet

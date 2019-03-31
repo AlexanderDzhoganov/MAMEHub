@@ -473,11 +473,8 @@ UINT64 trackFrameNumber = 0;
 attotime largestEmulationTime(0,0);
 vector<int> peerIDs;
 
-void running_machine::mainLoop()
+bool running_machine::mainLoop()
 {
-  attotime timeBefore = m_scheduler.time();
-  attotime machineTimeBefore = machine_time();
-
   if (netClient && !netClient->initComplete)
   {
     if(!netCommon->update(this))
@@ -488,8 +485,11 @@ void running_machine::mainLoop()
 
     // ui().update_and_render(&(render().ui_container()));
     // osd().update(false);
-    return;
+    return false;
   }
+
+  attotime timeBefore = m_scheduler.time();
+  attotime machineTimeBefore = machine_time();
 
   if (!m_paused)
   {
@@ -644,7 +644,7 @@ void running_machine::mainLoop()
         if(survivedAndGotSync.first==false)
         {
           m_exit_pending = true;
-          return;
+          return false;
         }
 
         // Don't try to resync on the same frame that you created
@@ -665,7 +665,7 @@ void running_machine::mainLoop()
     }
   }
 
-  return;
+  return true; // TODO FIXME, code below crashes?
 
   // handle save/load
   if (timePassed && m_saveload_schedule != SLS_NONE)
@@ -1851,7 +1851,9 @@ void js_main_loop() {
 	scheduler = &(jsmess_machine->scheduler());
 	attotime stoptime = scheduler->time() + attotime(0,HZ_TO_ATTOSECONDS(60));
 	while (scheduler->time() < stoptime) {
-    jsmess_machine->mainLoop();
+    if (!jsmess_machine->mainLoop()) {
+      break;
+    }
 	}
 }
 
