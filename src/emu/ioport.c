@@ -1558,7 +1558,7 @@ map<const ioport_field*,const ioport_field*> playerFieldMap;
 
 const input_seq &ioport_field::seq(bool checkMapping, input_seq_type seqtype) const
 {
-  if(checkMapping && netCommon && netCommon->getSelfPeerID()>0) {
+  if(checkMapping && netCommon && netCommon->getSelfPeerID() > 0) {
     int player = netCommon->getPlayer();
 
     ioport_type typeToMap = type();

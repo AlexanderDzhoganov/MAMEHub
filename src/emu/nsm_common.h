@@ -14,7 +14,6 @@
 #include <vector>
 
 #include <boost/circular_buffer.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "raknet_shim.h"
 
@@ -137,7 +136,7 @@ class Common {
   int secondsBetweenSync;
   int globalInputCounter;
 
-  std::vector<boost::shared_ptr<MemoryBlock> > blocks, staleBlocks;
+  std::vector<std::shared_ptr<MemoryBlock> > blocks, staleBlocks;
 
   z_stream inputStream;
   z_stream outputStream;
@@ -167,14 +166,14 @@ class Common {
 
   void setSecondsBetweenSync(int _secondsBetweenSync);
 
-  virtual std::vector<boost::shared_ptr<MemoryBlock> >
+  virtual std::vector<std::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size) = 0;
 
   virtual bool update(running_machine *machine) = 0;
 
   int getNumBlocks() { return int(blocks.size()); }
 
-  boost::shared_ptr<MemoryBlock> getMemoryBlock(int i) { return blocks[i]; }
+  std::shared_ptr<MemoryBlock> getMemoryBlock(int i) { return blocks[i]; }
 
   nsm::Attotime newAttotime(int seconds, long long attoseconds) {
     nsm::Attotime at;

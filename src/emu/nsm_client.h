@@ -12,7 +12,7 @@ class running_machine;
 
 class Client : public Common {
 protected:
-  std::vector<boost::shared_ptr<MemoryBlock> > syncCheckBlocks;
+  std::vector<std::shared_ptr<MemoryBlock> > syncCheckBlocks;
   std::vector<unsigned char> incomingMsg;
 
   unsigned char *syncPtr;
@@ -35,7 +35,7 @@ protected:
 
   void shutdown();
 
-  std::vector<boost::shared_ptr<MemoryBlock> >
+  std::vector<std::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size);
 
   bool initializeConnection(running_machine *machine);

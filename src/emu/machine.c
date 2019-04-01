@@ -68,34 +68,34 @@
 
 ***************************************************************************/
 
+#include "nsm_client.h"
 #include "nsm_common.h"
 #include "nsm_server.h"
-#include "nsm_client.h"
 
 #include <boost/circular_buffer.hpp>
 
+#include "cheat.h"
+#include "crsshair.h"
+#include "debug/debugcon.h"
+#include "debug/debugvw.h"
+#include "debugger.h"
 #include "emu.h"
+#include "emuconfig.h"
 #include "emuopts.h"
 #include "osdepend.h"
-#include "emuconfig.h"
-#include "debugger.h"
 #include "render.h"
-#include "cheat.h"
 #include "ui/selgame.h"
 #include "ui/ui.h"
 #include "uiinput.h"
-#include "crsshair.h"
-#include "validity.h"
 #include "unzip.h"
-#include "debug/debugcon.h"
-#include "debug/debugvw.h"
+#include "validity.h"
 
 #include <time.h>
 
 #ifdef SDLMAME_EMSCRIPTEN
 #include <emscripten.h>
 
-void js_set_main_loop(running_machine * machine);
+void js_set_main_loop(running_machine *machine);
 #endif
 
 
@@ -109,7 +109,6 @@ using boost::circular_buffer;
 
 // a giant string buffer for temporary strings
 static char giant_string_buffer[65536] = { 0 };
-
 
 
 //**************************************************************************
@@ -126,45 +125,26 @@ osd_interface &running_machine::osd() const
 //-------------------------------------------------
 
 running_machine::running_machine(const machine_config &_config, machine_manager &manager)
-  : firstcpu(NULL),
-    primary_screen(NULL),
-    debug_flags(0),
-    romload_data(NULL),
-    ui_input_data(NULL),
-    debugcpu_data(NULL),
-    generic_machine_data(NULL),
-    m_config(_config),
-    m_system(_config.gamedrv()),
-    m_manager(manager),
-    m_current_phase(MACHINE_PHASE_PREINIT),
-    m_paused(false),
-    m_hard_reset_pending(false),
-    m_exit_pending(false),
-    m_soft_reset_timer(NULL),
-    m_rand_seed(0x9d14abd7),
-    m_ui_active(_config.options().ui_active()),
-    m_basename(_config.gamedrv().name),
-    m_sample_rate(_config.options().sample_rate()),
-    m_saveload_schedule(SLS_NONE),
-    m_saveload_schedule_time(attotime::zero),
-    m_saveload_searchpath(NULL),
+: firstcpu(NULL), primary_screen(NULL), debug_flags(0), romload_data(NULL), ui_input_data(NULL),
+  debugcpu_data(NULL), generic_machine_data(NULL), m_config(_config), m_system(_config.gamedrv()),
+  m_manager(manager), m_current_phase(MACHINE_PHASE_PREINIT), m_paused(false),
+  m_hard_reset_pending(false), m_exit_pending(false), m_soft_reset_timer(NULL),
+  m_rand_seed(0x9d14abd7), m_ui_active(_config.options().ui_active()),
+  m_basename(_config.gamedrv().name), m_sample_rate(_config.options().sample_rate()),
+  m_saveload_schedule(SLS_NONE), m_saveload_schedule_time(attotime::zero), m_saveload_searchpath(NULL),
 
-    m_save(*this),
-    m_memory(*this),
-    m_ioport(*this),
-    m_parameters(*this),
-    m_scheduler(*this)
+  m_save(*this), m_memory(*this), m_ioport(*this), m_parameters(*this), m_scheduler(*this)
 {
   memset(&m_base_time, 0, sizeof(m_base_time));
 
   // set the machine on all devices
   device_iterator iter(root_device());
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
     device->set_machine(*this);
 
   // find devices
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
-    if (dynamic_cast<cpu_device *>(device) != NULL)
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
+    if(dynamic_cast<cpu_device *>(device) != NULL)
     {
       firstcpu = downcast<cpu_device *>(device);
       break;
@@ -173,7 +153,7 @@ running_machine::running_machine(const machine_config &_config, machine_manager 
   primary_screen = screeniter.first();
 
   // fetch core options
-  if (options().debug())
+  if(options().debug())
     debug_flags = (DEBUG_FLAG_ENABLED | DEBUG_FLAG_CALL_HOOK) | (DEBUG_FLAG_OSD_ENABLED);
 }
 
@@ -195,11 +175,12 @@ running_machine::~running_machine()
 const char *running_machine::describe_context()
 {
   device_execute_interface *executing = m_scheduler.currently_executing();
-  if (executing != NULL)
+  if(executing != NULL)
   {
     cpu_device *cpu = dynamic_cast<cpu_device *>(&executing->device());
-    if (cpu != NULL)
-      m_context.printf("'%s' (%s)", cpu->tag(), core_i64_format(cpu->pc(), cpu->space(AS_PROGRAM).logaddrchars(), cpu->is_octal()));
+    if(cpu != NULL)
+      m_context.printf("'%s' (%s)", cpu->tag(),
+                       core_i64_format(cpu->pc(), cpu->space(AS_PROGRAM).logaddrchars(), cpu->is_octal()));
   }
   else
     m_context.cpy("(no context)");
@@ -225,7 +206,8 @@ void running_machine::start()
   generic_machine_init(*this);
 
   // allocate a soft_reset timer
-  m_soft_reset_timer = m_scheduler.timer_alloc(timer_expired_delegate(FUNC(running_machine::soft_reset), this));
+  m_soft_reset_timer =
+  m_scheduler.timer_alloc(timer_expired_delegate(FUNC(running_machine::soft_reset), this));
 
   // init the osd layer
   m_manager.osd().init(*this);
@@ -234,15 +216,15 @@ void running_machine::start()
   m_video.reset(global_alloc(video_manager(*this)));
   m_ui.reset(global_alloc(ui_manager(*this)));
 
-  if(options().server()||options().client())
+  if(options().server() || options().client())
   {
     // Make the base time a constant for MAMEHub consistency
     m_base_time = 946080000ULL;
   }
   else
   {
-  // initialize the base time (needed for doing record/playback)
-  ::time(&m_base_time);
+    // initialize the base time (needed for doing record/playback)
+    ::time(&m_base_time);
   }
 
   // initialize the input system and input ports for the game
@@ -266,8 +248,9 @@ void running_machine::start()
   m_memory.initialize();
 
   // initialize the watchdog
-  m_watchdog_timer = m_scheduler.timer_alloc(timer_expired_delegate(FUNC(running_machine::watchdog_fired), this));
-  if (config().m_watchdog_vblank_count != 0 && primary_screen != NULL)
+  m_watchdog_timer =
+  m_scheduler.timer_alloc(timer_expired_delegate(FUNC(running_machine::watchdog_fired), this));
+  if(config().m_watchdog_vblank_count != 0 && primary_screen != NULL)
     primary_screen->register_vblank_callback(vblank_state_delegate(FUNC(running_machine::watchdog_vblank), this));
   save().save_item(NAME(m_watchdog_enabled));
   save().save_item(NAME(m_watchdog_counter));
@@ -282,7 +265,7 @@ void running_machine::start()
   network_init(*this);
 
   // initialize the debugger
-  if ((debug_flags & DEBUG_FLAG_ENABLED) != 0)
+  if((debug_flags & DEBUG_FLAG_ENABLED) != 0)
     debugger_init(*this);
 
   // call the game driver's init function
@@ -297,23 +280,24 @@ void running_machine::start()
   start_all_devices();
   save().register_postload(save_prepost_delegate(FUNC(running_machine::postload_all_devices), this));
 
-  m_machine_time = attotime(0,0);
+  m_machine_time = attotime(0, 0);
   isRollback = false;
 
   // if we're coming in with a savegame request, process it now
   const char *savegame = options().state();
-  if (savegame[0] != 0)
+  if(savegame[0] != 0)
     schedule_load(savegame);
 
   // if we're in autosave mode, schedule a load
-  else if (options().autosave() && (m_system.flags & GAME_SUPPORTS_SAVE) != 0)
+  else if(options().autosave() && (m_system.flags & GAME_SUPPORTS_SAVE) != 0)
     schedule_load("auto");
 
   // set up the cheat engine
   m_cheat.reset(global_alloc(cheat_manager(*this)));
 
   // allocate autoboot timer
-  m_autoboot_timer = scheduler().timer_alloc(timer_expired_delegate(FUNC(running_machine::autoboot_callback), this));
+  m_autoboot_timer =
+  scheduler().timer_alloc(timer_expired_delegate(FUNC(running_machine::autoboot_callback), this));
 
   manager().update_machine();
 }
@@ -330,8 +314,8 @@ device_t &running_machine::add_dynamic_device(device_t &owner, device_type type,
 
   // notify this device and all its subdevices that they are now configured
   device_iterator iter(root_device());
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
-    if (!device->configured())
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
+    if(!device->configured())
       device->config_complete();
   return *device;
 }
@@ -346,10 +330,10 @@ attotime rollbackTime;
 //  run - execute the machine
 //-------------------------------------------------
 
-extern list< ChatLog > chatLogs;
-extern circular_buffer<std::pair<attotime,InputState> > playerInputData[MAX_PLAYERS];
+extern list<ChatLog> chatLogs;
+extern circular_buffer<std::pair<attotime, InputState>> playerInputData[MAX_PLAYERS];
 
-void running_machine::processNetworkBuffer(PeerInputData *inputData,int peerID)
+void running_machine::processNetworkBuffer(PeerInputData *inputData, int peerID)
 {
   if(inputData == NULL)
   {
@@ -358,24 +342,33 @@ void running_machine::processNetworkBuffer(PeerInputData *inputData,int peerID)
 
   if(inputData->inputtype() == PeerInputData::INPUT)
   {
-    //printf("GOT INPUT\n");
+    // printf("GOT INPUT\n");
     attotime tmptime(inputData->time().seconds(), inputData->time().attoseconds());
 
-    for(int a=0;a<inputData->inputstate().players_size();a++) {
-      //int player = inputData->inputstate().players(a);
-      //cout << "Peer " << peerID << " has input for player " << inputData->inputstate().players(a) << " at time " << tmptime.seconds << "." << tmptime.attoseconds << endl;
-      circular_buffer<pair<attotime,InputState> > &onePlayerInputData = playerInputData[inputData->inputstate().players(a)];
-      if(onePlayerInputData.empty()) {
-        onePlayerInputData.insert(onePlayerInputData.begin(),pair<attotime,InputState>(tmptime,inputData->inputstate()));
-      } else {
-        //TODO: Re-think this and clean it up
-        if (netCommon->isRollback()) {
-          circular_buffer<pair<attotime,InputState> >::reverse_iterator it = onePlayerInputData.rbegin();
+    for(int a = 0; a < inputData->inputstate().players_size(); a++)
+    {
+      // int player = inputData->inputstate().players(a);
+      // cout << "Peer " << peerID << " has input for player " << inputData->inputstate().players(a) << " at time " << tmptime.seconds << "." << tmptime.attoseconds << endl;
+      circular_buffer<pair<attotime, InputState>> &onePlayerInputData =
+      playerInputData[inputData->inputstate().players(a)];
+      if(onePlayerInputData.empty())
+      {
+        onePlayerInputData.insert(onePlayerInputData.begin(),
+                                  pair<attotime, InputState>(tmptime, inputData->inputstate()));
+      }
+      else
+      {
+        // TODO: Re-think this and clean it up
+        if(netCommon->isRollback())
+        {
+          circular_buffer<pair<attotime, InputState>>::reverse_iterator it = onePlayerInputData.rbegin();
           attotime lastInputTime = it->first;
-          if (lastInputTime == tmptime) {
+          if(lastInputTime == tmptime)
+          {
             return;
           }
-          if (lastInputTime > tmptime) {
+          if(lastInputTime > tmptime)
+          {
             cout << "unexpected time " << lastInputTime << " " << tmptime << "\n";
             exit(1);
           }
@@ -383,50 +376,61 @@ void running_machine::processNetworkBuffer(PeerInputData *inputData,int peerID)
           // Check if the input states are equal.
           std::string s1string;
           std::string s2string;
-          //cout << "First serialize\n";
+          // cout << "First serialize\n";
           ::nsm::InputState s1 = inputData->inputstate();
           ::nsm::InputState s2 = it->second;
           s1.set_framecount(0);
           s2.set_framecount(0);
           s1.SerializeToString(&s1string);
-          //cout << "Second serialize\n";
+          // cout << "Second serialize\n";
           s2.SerializeToString(&s2string);
-          if (s1string != s2string) {
+          if(s1string != s2string)
+          {
             attotime currentMachineTime = machine_time();
-            if (currentMachineTime > tmptime) {
-              if (doRollback) {
-                if (rollbackTime > tmptime) {
+            if(currentMachineTime > tmptime)
+            {
+              if(doRollback)
+              {
+                if(rollbackTime > tmptime)
+                {
                   // Roll back further
                   rollbackTime = tmptime;
                   cout << "Rolling back further from " << currentMachineTime << " to " << tmptime << endl;
                 }
-              } else {
+              }
+              else
+              {
                 // Roll back
                 cout << "Rolling back from " << currentMachineTime << " to " << tmptime << endl;
                 rollbackTime = tmptime;
-                doRollback=true;
+                doRollback = true;
               }
             }
           }
 
-          onePlayerInputData.push_back(make_pair(tmptime,inputData->inputstate()));
-        } else { // no rollback
-          for(circular_buffer<pair<attotime,InputState> >::reverse_iterator it = onePlayerInputData.rbegin();
-              it != onePlayerInputData.rend();
-              it++) {
-            //cout << "IN INPUT LOOP\n";
-            if(it->first < tmptime) {
-              onePlayerInputData.insert(
-                it.base(), // NOTE: base() returns the iterator 1 position in the past
-                pair<attotime,InputState>(tmptime,inputData->inputstate()));
+          onePlayerInputData.push_back(make_pair(tmptime, inputData->inputstate()));
+        }
+        else
+        { // no rollback
+          for(circular_buffer<pair<attotime, InputState>>::reverse_iterator it = onePlayerInputData.rbegin();
+              it != onePlayerInputData.rend(); it++)
+          {
+            // cout << "IN INPUT LOOP\n";
+            if(it->first < tmptime)
+            {
+              onePlayerInputData.insert(it.base(), // NOTE: base() returns the iterator 1 position in the past
+                                        pair<attotime, InputState>(tmptime, inputData->inputstate()));
               break;
-            } else if(it->first == tmptime) {
-              //TODO: If two peers send inputs at the same time for the same player, break ties with peer id.
+            }
+            else if(it->first == tmptime)
+            {
+              // TODO: If two peers send inputs at the same time for the same player, break ties with peer id.
               break;
-            } else if(it == onePlayerInputData.rend()) {
-              onePlayerInputData.insert(
-                onePlayerInputData.begin(),
-                pair<attotime,InputState>(tmptime,inputData->inputstate()));
+            }
+            else if(it == onePlayerInputData.rend())
+            {
+              onePlayerInputData.insert(onePlayerInputData.begin(),
+                                        pair<attotime, InputState>(tmptime, inputData->inputstate()));
               break;
             }
           }
@@ -439,25 +443,25 @@ void running_machine::processNetworkBuffer(PeerInputData *inputData,int peerID)
     string buffer = inputData->inputbuffer();
     cout << "GOT CHAT " << buffer << endl;
     char buf[4096];
-    sprintf(buf,"%s: %s",netCommon->getPeerNameFromID(peerID).c_str(),buffer.c_str());
+    sprintf(buf, "%s: %s", netCommon->getPeerNameFromID(peerID).c_str(), buffer.c_str());
     astring chatAString = astring(buf);
-    //Figure out the index of who spoke and send that
-    chatLogs.push_back(ChatLog(peerID,::time(NULL),chatAString));
+    // Figure out the index of who spoke and send that
+    chatLogs.push_back(ChatLog(peerID, ::time(NULL), chatAString));
   }
   else if(inputData->inputtype() == PeerInputData::FORCE_VALUE)
   {
     const string &buffer = inputData->inputbuffer();
     cout << "FORCING VALUE\n";
-    int blockIndex,memoryStart,memorySize,value;
-    unsigned char ramRegion,memoryMask;
-    memcpy(&ramRegion,&buffer[0]+1,sizeof(int));
-    memcpy(&blockIndex,&buffer[0]+2,sizeof(int));
-    memcpy(&memoryStart,&buffer[0]+6,sizeof(int));
-    memcpy(&memorySize,&buffer[0]+10,sizeof(int));
-    memcpy(&memoryMask,&buffer[0]+14,sizeof(unsigned char));
-    memcpy(&value,&buffer[0]+15,sizeof(int));
+    int blockIndex, memoryStart, memorySize, value;
+    unsigned char ramRegion, memoryMask;
+    memcpy(&ramRegion, &buffer[0] + 1, sizeof(int));
+    memcpy(&blockIndex, &buffer[0] + 2, sizeof(int));
+    memcpy(&memoryStart, &buffer[0] + 6, sizeof(int));
+    memcpy(&memorySize, &buffer[0] + 10, sizeof(int));
+    memcpy(&memoryMask, &buffer[0] + 14, sizeof(unsigned char));
+    memcpy(&value, &buffer[0] + 15, sizeof(int));
     // New force
-    netCommon->forceLocation(BlockValueLocation(ramRegion,blockIndex,memoryStart,memorySize,memoryMask),value);
+    netCommon->forceLocation(BlockValueLocation(ramRegion, blockIndex, memoryStart, memorySize, memoryMask), value);
     ui().popup_time(3, "Server created new cheat");
   }
   else
@@ -466,15 +470,15 @@ void running_machine::processNetworkBuffer(PeerInputData *inputData,int peerID)
   }
 }
 
-RakNet::Time emulationStartTime=0;
+RakNet::Time emulationStartTime = 0;
 UINT64 inputFrameNumber = 0;
 UINT64 trackFrameNumber = 0;
-attotime largestEmulationTime(0,0);
+attotime largestEmulationTime(0, 0);
 vector<int> peerIDs;
 
 void running_machine::emscripten_main_loop()
 {
-  if (netClient && netClient->syncing)
+  if(netClient && netClient->syncing)
   {
     m_video->frame_update();
 
@@ -490,12 +494,12 @@ void running_machine::emscripten_main_loop()
   attotime timeBefore = m_scheduler.time();
   attotime machineTimeBefore = machine_time();
 
-  if (!m_paused)
+  if(!m_paused)
   {
     // execute CPUs if not paused
     attotime stoptime = m_scheduler.time() + attotime(0, HZ_TO_ATTOSECONDS(60));
 
-    while (m_scheduler.time() < stoptime)
+    while(m_scheduler.time() < stoptime)
     {
       m_scheduler.timeslice();
     }
@@ -508,13 +512,13 @@ void running_machine::emscripten_main_loop()
 
   attotime timeAfter = m_scheduler.time();
 
-  if (timeBefore > timeAfter)
+  if(timeBefore > timeAfter)
   {
     cout << "OOPS! WE WENT BACK IN TIME SOMEHOW\n";
     exit(1);
   }
 
-  if (timeAfter > largestEmulationTime)
+  if(timeAfter > largestEmulationTime)
   {
     largestEmulationTime = timeAfter;
     catchingUp = false;
@@ -524,16 +528,17 @@ void running_machine::emscripten_main_loop()
   bool secondPassed = false;
   bool tenthSecondPassed = false;
 
-  if (timePassed)
+  if(timePassed)
   {
-    //cout << "TIME MOVED FROM " << timeBefore << " TO " << timeAfter << endl;
+    // cout << "TIME MOVED FROM " << timeBefore << " TO " << timeAfter << endl;
     m_machine_time += (timeAfter - timeBefore);
     attotime machineTimeAfter = machine_time();
     secondPassed = machineTimeBefore.seconds != machineTimeAfter.seconds;
-    tenthSecondPassed = secondPassed ||
-      ((machineTimeBefore.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)) != (machineTimeAfter.attoseconds/(ATTOSECONDS_PER_SECOND/10ULL)));
+    tenthSecondPassed =
+    secondPassed || ((machineTimeBefore.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)) !=
+                     (machineTimeAfter.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)));
 
-    if (netCommon)
+    if(netCommon)
     {
       // Process any remaining packets.
       if(!netCommon->update(this))
@@ -543,13 +548,13 @@ void running_machine::emscripten_main_loop()
       }
 
       netCommon->getPeerIDs(peerIDs);
-      
-      for (int a = 0; a < peerIDs.size(); a++)
+
+      for(int a = 0; a < peerIDs.size(); a++)
       {
         while(true)
         {
           nsm::PeerInputData input = netCommon->popInput(peerIDs[a]);
-          if (!input.has_time())
+          if(!input.has_time())
           {
             break;
           }
@@ -560,21 +565,23 @@ void running_machine::emscripten_main_loop()
     }
   }
 
-  //printf("EMULATION FINISHED\n");
+  // printf("EMULATION FINISHED\n");
   static int lastSyncSecond = 0;
   static int firstTimeAtSecond = 0;
 
   if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed && !firstTimeAtSecond)
   {
     firstTimeAtSecond = 1;
-    if (netServer)
+    if(netServer)
     {
       // Initial sync
       netServer->sync(this);
+
+      // netServer->acceptPeer("test", this); // TODO FIXME this causes a crash
       // nvram_save(); // TODO FIXME necessary?
     }
 
-    if (netClient)
+    if(netClient)
     {
       if(!netClient->initializeConnection(this))
       {
@@ -590,17 +597,12 @@ void running_machine::emscripten_main_loop()
   }
   else if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed)
   {
-    if(
-      netServer &&
-      lastSyncSecond != m_machine_time.seconds &&
-      netServer->getSecondsBetweenSync()>0 &&
-      !netCommon->isRollback() &&
-      (m_machine_time.seconds%netServer->getSecondsBetweenSync())==0
-      )
+    if(netServer && lastSyncSecond != m_machine_time.seconds && netServer->getSecondsBetweenSync() > 0 &&
+       !netCommon->isRollback() && (m_machine_time.seconds % netServer->getSecondsBetweenSync()) == 0)
     {
       lastSyncSecond = m_machine_time.seconds;
-      printf("SERVER SYNC AT TIME: %d\n",int(::time(NULL)));
-      if (!m_scheduler.can_save())
+      printf("SERVER SYNC AT TIME: %d\n", int(::time(NULL)));
+      if(!m_scheduler.can_save())
       {
         printf("ANONYMOUS TIMER! COULD NOT DO FULL SYNC\n");
       }
@@ -608,30 +610,27 @@ void running_machine::emscripten_main_loop()
       {
         netServer->sync(this);
         // nvram_save();
-        cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << machine_time().seconds << '.' << machine_time().attoseconds << endl;
+        cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << machine_time().seconds << '.'
+             << machine_time().attoseconds << endl;
       }
     }
 
-    if(
-      netClient &&
-      netClient->initComplete &&
-      lastSyncSecond != m_machine_time.seconds &&
-      netClient->getSecondsBetweenSync()>0 &&
-      !netCommon->isRollback() &&
-      (m_machine_time.seconds%netClient->getSecondsBetweenSync())==0
-      )
+    if(netClient && netClient->initComplete && lastSyncSecond != m_machine_time.seconds &&
+       netClient->getSecondsBetweenSync() > 0 && !netCommon->isRollback() &&
+       (m_machine_time.seconds % netClient->getSecondsBetweenSync()) == 0)
     {
       lastSyncSecond = m_machine_time.seconds;
-      if (!m_scheduler.can_save())
+      if(!m_scheduler.can_save())
       {
         printf("ANONYMOUS TIMER! THIS COULD BE BAD (BUT HOPEFULLY ISN'T)\n");
       }
       else
       {
-        //The client should update sync check just in case the server didn't have an anon timer
+        // The client should update sync check just in case the server didn't have an anon timer
         m_save.dispatch_presave();
         netClient->updateSyncCheck();
-        cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << machine_time().seconds << '.' << machine_time().attoseconds << endl;
+        cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << machine_time().seconds << '.'
+             << machine_time().attoseconds << endl;
         m_save.dispatch_postload();
       }
     }
@@ -658,10 +657,11 @@ void running_machine::emscripten_main_loop()
         }
 
         // Don't try to resync on the same frame that you created the sync check.
-        if (lastSyncSecond != m_machine_time.seconds) {
+        if(lastSyncSecond != m_machine_time.seconds)
+        {
           if(netClient->sync(this))
           {
-            if (!m_scheduler.can_save())
+            if(!m_scheduler.can_save())
             {
               printf("ANONYMOUS TIMER! THIS COULD BE BAD (BUT HOPEFULLY ISN'T)\n");
             }
@@ -675,25 +675,25 @@ void running_machine::emscripten_main_loop()
   }
 
   // handle save/load
-  if (timePassed && m_saveload_schedule != SLS_NONE)
+  if(timePassed && m_saveload_schedule != SLS_NONE)
   {
     handle_saveload();
   }
-  else if (timePassed && netCommon && netCommon->isRollback())
+  else if(timePassed && netCommon && netCommon->isRollback())
   {
-    if (trackFrameNumber > 0 && m_scheduler.can_save() && trackFrameNumber != inputFrameNumber)
+    if(trackFrameNumber > 0 && m_scheduler.can_save() && trackFrameNumber != inputFrameNumber)
     {
       isRollback = true;
       immediate_save("test");
       cout << "SAVING AT TIME " << m_machine_time << endl;
       isRollback = false;
-      trackFrameNumber=0;
+      trackFrameNumber = 0;
     }
 
     if(m_machine_time.seconds > 0 && m_scheduler.can_save() && tenthSecondPassed)
     {
       cout << "Tenth second passed: " << m_machine_time << endl;
-      if (secondPassed)
+      if(secondPassed)
       {
         cout << "Second passed" << endl;
       }
@@ -713,9 +713,11 @@ void running_machine::emscripten_main_loop()
       }
       */
     }
-    
-    if(m_machine_time.seconds > 0 && m_scheduler.can_save()) {
-      if (doRollback) {
+
+    if(m_machine_time.seconds > 0 && m_scheduler.can_save())
+    {
+      if(doRollback)
+      {
         doRollback = false;
         isRollback = true;
         immediate_load("test");
@@ -728,8 +730,8 @@ void running_machine::emscripten_main_loop()
 
 int running_machine::run(bool firstrun)
 {
-  //JJG: Add media path to mess search path
-  strcpy(CORE_SEARCH_PATH,options().media_path());
+  // JJG: Add media path to mess search path
+  strcpy(CORE_SEARCH_PATH, options().media_path());
 
   int error = MAMERR_NONE;
 
@@ -737,7 +739,7 @@ int running_machine::run(bool firstrun)
   m_current_phase = MACHINE_PHASE_INIT;
 
   // if we have a logfile, set up the callback
-  if (options().log())
+  if(options().log())
   {
     m_logfile.reset(global_alloc(emu_file(OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS)));
     file_error filerr = m_logfile->open("error.log");
@@ -753,10 +755,11 @@ int running_machine::run(bool firstrun)
 
   if((system().flags & GAME_SUPPORTS_SAVE) == 0)
   {
-    ui().popup_time(10, "This game does not have complete save state support, desyncs may not be resolved correctly.");
+    ui().popup_time(10, "This game does not have complete save state support, desyncs may "
+                        "not be resolved correctly.");
   }
 
-  //After loading config but before loading nvram, initialize the network
+  // After loading config but before loading nvram, initialize the network
   if(netServer)
   {
     netServer->setSecondsBetweenSync(options().secondsBetweenSync());
@@ -779,14 +782,14 @@ int running_machine::run(bool firstrun)
   // perform a soft reset -- this takes us to the running phase
   soft_reset();
 
-  #ifdef MAME_DEBUG
+#ifdef MAME_DEBUG
   g_tagmap_finds = 0;
-  if (strcmp(config().m_gamedrv.name, "___empty") != 0)
+  if(strcmp(config().m_gamedrv.name, "___empty") != 0)
     g_tagmap_counter_enabled = true;
-  #endif
-   
+#endif
+
   // handle initial load
-  if (m_saveload_schedule != SLS_NONE)
+  if(m_saveload_schedule != SLS_NONE)
     handle_saveload();
 
   printf("SOFT RESET FINISHED\n");
@@ -795,7 +798,7 @@ int running_machine::run(bool firstrun)
 
   m_hard_reset_pending = false;
 
-  //break out to our async javascript loop and halt
+  // break out to our async javascript loop and halt
   js_set_main_loop(this);
   return error;
 }
@@ -813,16 +816,16 @@ void running_machine::schedule_exit()
   m_scheduler.eat_all_cycles();
 
 #ifdef MAME_DEBUG
-  if (g_tagmap_counter_enabled)
+  if(g_tagmap_counter_enabled)
   {
     g_tagmap_counter_enabled = false;
-    if (*(options().command()) == 0)
+    if(*(options().command()) == 0)
       osd_printf_info("%d tagmap lookups\n", g_tagmap_finds);
   }
 #endif
 
   // if we're autosaving on exit, schedule a save as well
-  if (options().autosave() && (m_system.flags & GAME_SUPPORTS_SAVE) && this->time() > attotime::zero)
+  if(options().autosave() && (m_system.flags & GAME_SUPPORTS_SAVE) && this->time() > attotime::zero)
     schedule_save("auto");
 }
 
@@ -869,24 +872,24 @@ void running_machine::schedule_soft_reset()
 astring running_machine::get_statename(const char *option)
 {
   astring statename_str("");
-  if (option == NULL || option[0] == 0)
+  if(option == NULL || option[0] == 0)
     statename_str.cpy("%g");
   else
     statename_str.cpy(option);
 
   // strip any extension in the provided statename
   int index = statename_str.rchr(0, '.');
-  if (index != -1)
+  if(index != -1)
     statename_str.substr(0, index);
 
   // handle %d in the template (for image devices)
   astring statename_dev("%d_");
   int pos = statename_str.find(0, statename_dev);
 
-  if (pos != -1)
+  if(pos != -1)
   {
     // if more %d are found, revert to default and ignore them all
-    if (statename_str.find(pos + 3, statename_dev) != -1)
+    if(statename_str.find(pos + 3, statename_dev) != -1)
       statename_str.cpy("%g");
     // else if there is a single %d, try to create the correct snapname
     else
@@ -898,42 +901,42 @@ astring running_machine::get_statename(const char *option)
       int end2 = statename_str.find(pos + 3, "%");
       int end = -1;
 
-      if ((end1 != -1) && (end2 != -1))
+      if((end1 != -1) && (end2 != -1))
         end = MIN(end1, end2);
-      else if (end1 != -1)
+      else if(end1 != -1)
         end = end1;
-      else if (end2 != -1)
+      else if(end2 != -1)
         end = end2;
       else
         end = statename_str.len();
 
-      if (end - pos < 3)
+      if(end - pos < 3)
         fatalerror("Something very wrong is going on!!!\n");
 
       // copy the device name to an astring
       astring devname_str;
       devname_str.cpysubstr(statename_str, pos + 3, end - pos - 3);
-      //printf("check template: %s\n", devname_str.cstr());
+      // printf("check template: %s\n", devname_str.cstr());
 
       // verify that there is such a device for this system
       image_interface_iterator iter(root_device());
-      for (device_image_interface *image = iter.first(); image != NULL; image = iter.next())
+      for(device_image_interface *image = iter.first(); image != NULL; image = iter.next())
       {
         // get the device name
         astring tempdevname(image->brief_instance_name());
-        //printf("check device: %s\n", tempdevname.cstr());
+        // printf("check device: %s\n", tempdevname.cstr());
 
-        if (devname_str.cmp(tempdevname) == 0)
+        if(devname_str.cmp(tempdevname) == 0)
         {
           // verify that such a device has an image mounted
-          if (image->basename_noext() != NULL)
+          if(image->basename_noext() != NULL)
           {
             astring filename(image->basename_noext());
 
             // setup snapname and remove the %d_
             statename_str.replace(0, devname_str, filename);
             statename_str.del(pos, 3);
-            //printf("check image: %s\n", filename.cstr());
+            // printf("check image: %s\n", filename.cstr());
 
             name_found = 1;
           }
@@ -941,7 +944,7 @@ astring running_machine::get_statename(const char *option)
       }
 
       // or fallback to default
-      if (name_found == 0)
+      if(name_found == 0)
         statename_str.cpy("%g");
     }
   }
@@ -961,7 +964,7 @@ astring running_machine::get_statename(const char *option)
 void running_machine::set_saveload_filename(const char *filename)
 {
   // free any existing request and allocate a copy of the requested name
-  if (osd_is_absolute_path(filename))
+  if(osd_is_absolute_path(filename))
   {
     m_saveload_searchpath = NULL;
     m_saveload_pending_file.cpy(filename);
@@ -1059,11 +1062,11 @@ void running_machine::pause()
 {
   if(netCommon)
   {
-    //Can't pause during netplay
+    // Can't pause during netplay
     return;
   }
   // ignore if nothing has changed
-  if (m_paused)
+  if(m_paused)
     return;
   m_paused = true;
 
@@ -1079,7 +1082,7 @@ void running_machine::pause()
 void running_machine::resume()
 {
   // ignore if nothing has changed
-  if (!m_paused)
+  if(!m_paused)
     return;
   m_paused = false;
 
@@ -1094,7 +1097,7 @@ void running_machine::resume()
 
 void running_machine::toggle_pause()
 {
-  if (paused())
+  if(paused())
     resume();
   else
     pause();
@@ -1111,7 +1114,7 @@ void running_machine::add_notifier(machine_notification event, machine_notify_de
   assert_always(m_current_phase == MACHINE_PHASE_INIT, "Can only call add_notifier at init time!");
 
   // exit notifiers are added to the head, and executed in reverse order
-  if (event == MACHINE_NOTIFY_EXIT)
+  if(event == MACHINE_NOTIFY_EXIT)
     m_notifier_list[event].prepend(*global_alloc(notifier_callback_item(callback)));
 
   // all other notifiers are added to the tail, and executed in the order registered
@@ -1127,7 +1130,8 @@ void running_machine::add_notifier(machine_notification event, machine_notify_de
 
 void running_machine::add_logerror_callback(logerror_callback callback)
 {
-  assert_always(m_current_phase == MACHINE_PHASE_INIT, "Can only call add_logerror_callback at init time!");
+  assert_always(m_current_phase == MACHINE_PHASE_INIT,
+                "Can only call add_logerror_callback at init time!");
   m_logerror_list.append(*global_alloc(logerror_callback_item(callback)));
 }
 
@@ -1139,7 +1143,7 @@ void running_machine::add_logerror_callback(logerror_callback callback)
 void CLIB_DECL running_machine::vlogerror(const char *format, va_list args)
 {
   // process only if there is a target
-  if (m_logerror_list.first() != NULL)
+  if(m_logerror_list.first() != NULL)
   {
     g_profiler.start(PROFILER_LOGERROR);
 
@@ -1147,7 +1151,7 @@ void CLIB_DECL running_machine::vlogerror(const char *format, va_list args)
     vsnprintf(giant_string_buffer, ARRAY_LENGTH(giant_string_buffer), format, args);
 
     // log to all callbacks
-    for (logerror_callback_item *cb = m_logerror_list.first(); cb != NULL; cb = cb->next())
+    for(logerror_callback_item *cb = m_logerror_list.first(); cb != NULL; cb = cb->next())
       (*cb->m_func)(*this, giant_string_buffer);
 
     g_profiler.stop();
@@ -1199,7 +1203,7 @@ UINT32 running_machine::rand()
 
 void running_machine::call_notifiers(machine_notification which)
 {
-  for (notifier_callback_item *cb = m_notifier_list[which].first(); cb != NULL; cb = cb->next())
+  for(notifier_callback_item *cb = m_notifier_list[which].first(); cb != NULL; cb = cb->next())
     cb->m_func();
 }
 
@@ -1210,16 +1214,19 @@ void running_machine::call_notifiers(machine_notification which)
 //-------------------------------------------------
 
 const int MAX_STATES = 10 * 5;
-pair<attotime, vector<unsigned char> > states[MAX_STATES];
+pair<attotime, vector<unsigned char>> states[MAX_STATES];
 int onState = 0;
 
 void running_machine::handle_saveload()
 {
-  if (!m_scheduler.can_save()) {
+  if(!m_scheduler.can_save())
+  {
     throw emu_fatalerror("CANNOT SAVE!");
   }
 
-  UINT32 openflags = (m_saveload_schedule == SLS_LOAD) ? OPEN_FLAG_READ : (OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
+  UINT32 openflags = (m_saveload_schedule == SLS_LOAD) ?
+                     OPEN_FLAG_READ :
+                     (OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
   const char *opnamed = (m_saveload_schedule == SLS_LOAD) ? "loaded" : "saved";
   const char *opname = (m_saveload_schedule == SLS_LOAD) ? "load" : "save";
   file_error filerr = FILERR_NONE;
@@ -1228,15 +1235,15 @@ void running_machine::handle_saveload()
 
   // if no name, bail
   emu_file file(m_saveload_searchpath, openflags);
-  if (!m_saveload_pending_file)
+  if(!m_saveload_pending_file)
     goto cancel;
 
   // if there are anonymous timers, we can't save just yet, and we can't load yet either
   // because the timers might overwrite data we have loaded
-  if (!m_scheduler.can_save())
+  if(!m_scheduler.can_save())
   {
     // if more than a second has passed, we're probably screwed
-    if ((this->time() - m_saveload_schedule_time) > attotime::from_seconds(1))
+    if((this->time() - m_saveload_schedule_time) > attotime::from_seconds(1))
     {
       popmessage("Unable to %s due to pending anonymous timers. See error.log for details.", opname);
       goto cancel;
@@ -1248,120 +1255,154 @@ void running_machine::handle_saveload()
   static int stateLength = 0;
 
   // open the file
-  if (!isRollback) {
-  filerr = file.open(m_saveload_pending_file);
-  } else {
-  if (m_saveload_schedule == SLS_LOAD) {
-    for (int a=0;a<MAX_STATES;a++) {
-      attotime stateTime = states[a].first;
-      if (stateTime.seconds == 0 && stateTime.attoseconds == 0) {
-        // Empty state
-        continue;
-      }
-      if (stateTime >= rollbackTime) {
-        // State in the future
-        continue;
-      }
-      if (bestState != -1 && states[bestState].first > stateTime) {
-        // We already found a better state
-        if (nextBestState == -1 || states[nextBestState].first < stateTime) {
-          nextBestState = a;
-        }
-        continue;
-      }
-      nextBestState = bestState;
-      bestState = a;
-    }
-    if (nextBestState == -1) {
-      cout << "ERROR: COULD NOT FIND ROLLBACK STATE FOR TIME " << rollbackTime << " " << machine_time() << endl;
-      exit(1);
-    }
-    cout << "Opening save file: " << states[bestState].first.seconds << "." << states[bestState].first.attoseconds << " < " << this->machine_time().seconds << "." << this->machine_time().attoseconds << endl;
-    cout << "ROLLBACK TIME: " << rollbackTime << endl;
-    vector<unsigned char> &v = states[bestState].second;
-    filerr = file.open_ram(&v[0],v.size());
-  } else {
-    filerr = file.open_ram(NULL,0);
+  if(!isRollback)
+  {
+    filerr = file.open(m_saveload_pending_file);
   }
+  else
+  {
+    if(m_saveload_schedule == SLS_LOAD)
+    {
+      for(int a = 0; a < MAX_STATES; a++)
+      {
+        attotime stateTime = states[a].first;
+        if(stateTime.seconds == 0 && stateTime.attoseconds == 0)
+        {
+          // Empty state
+          continue;
+        }
+        if(stateTime >= rollbackTime)
+        {
+          // State in the future
+          continue;
+        }
+        if(bestState != -1 && states[bestState].first > stateTime)
+        {
+          // We already found a better state
+          if(nextBestState == -1 || states[nextBestState].first < stateTime)
+          {
+            nextBestState = a;
+          }
+          continue;
+        }
+        nextBestState = bestState;
+        bestState = a;
+      }
+      if(nextBestState == -1)
+      {
+        cout << "ERROR: COULD NOT FIND ROLLBACK STATE FOR TIME " << rollbackTime << " "
+             << machine_time() << endl;
+        exit(1);
+      }
+      cout << "Opening save file: " << states[bestState].first.seconds << "."
+           << states[bestState].first.attoseconds << " < " << this->machine_time().seconds << "."
+           << this->machine_time().attoseconds << endl;
+      cout << "ROLLBACK TIME: " << rollbackTime << endl;
+      vector<unsigned char> &v = states[bestState].second;
+      filerr = file.open_ram(&v[0], v.size());
+    }
+    else
+    {
+      filerr = file.open_ram(NULL, 0);
+    }
   }
 
-  if (filerr == FILERR_NONE)
+  if(filerr == FILERR_NONE)
   {
     // read/write the save state
-    if (isRollback && m_saveload_schedule == SLS_LOAD) {
-      cout << "Time rolled back from " << this->machine_time().seconds << "." << this->machine_time().attoseconds;
+    if(isRollback && m_saveload_schedule == SLS_LOAD)
+    {
+      cout << "Time rolled back from " << this->machine_time().seconds << "."
+           << this->machine_time().attoseconds;
     }
     save_error saverr = (m_saveload_schedule == SLS_LOAD) ? m_save.read_file(file) : m_save.write_file(file);
-    if (isRollback && m_saveload_schedule == SLS_LOAD) {
+    if(isRollback && m_saveload_schedule == SLS_LOAD)
+    {
       m_machine_time = states[bestState].first;
       cout << " to " << this->machine_time().seconds << "." << this->machine_time().attoseconds << endl;
     }
 
     // handle the result
-    switch (saverr)
+    switch(saverr)
     {
-      case STATERR_ILLEGAL_REGISTRATIONS:
-        popmessage("Error: Unable to %s state due to illegal registrations. See error.log for details.", opname);
-        break;
+    case STATERR_ILLEGAL_REGISTRATIONS:
+      popmessage("Error: Unable to %s state due to illegal registrations. See error.log for "
+                 "details.",
+                 opname);
+      break;
 
-      case STATERR_INVALID_HEADER:
-        popmessage("Error: Unable to %s state due to an invalid header. Make sure the save state is correct for this game.", opname);
-        break;
+    case STATERR_INVALID_HEADER:
+      popmessage("Error: Unable to %s state due to an invalid header. Make sure the save "
+                 "state is correct for this game.",
+                 opname);
+      break;
 
-      case STATERR_READ_ERROR:
-        popmessage("Error: Unable to %s state due to a read error (file is likely corrupt).", opname);
-        break;
+    case STATERR_READ_ERROR:
+      popmessage("Error: Unable to %s state due to a read error (file is likely corrupt).", opname);
+      break;
 
-      case STATERR_WRITE_ERROR:
-        popmessage("Error: Unable to %s state due to a write error. Verify there is enough disk space.", opname);
-        break;
+    case STATERR_WRITE_ERROR:
+      popmessage("Error: Unable to %s state due to a write error. Verify there is enough "
+                 "disk space.",
+                 opname);
+      break;
 
-      case STATERR_NONE:
-                if (!isRollback) {
-        if (!(m_system.flags & GAME_SUPPORTS_SAVE))
-          popmessage("State successfully %s.\nWarning: Save states are not officially supported for this game.", opnamed);
+    case STATERR_NONE:
+      if(!isRollback)
+      {
+        if(!(m_system.flags & GAME_SUPPORTS_SAVE))
+          popmessage("State successfully %s.\nWarning: Save states are not officially "
+                     "supported for this game.",
+                     opnamed);
         else
           popmessage("State successfully %s.", opnamed);
-                }
-        break;
+      }
+      break;
 
-      default:
-        popmessage("Error: Unknown error during state %s.", opnamed);
-        break;
+    default:
+      popmessage("Error: Unknown error during state %s.", opnamed);
+      break;
     }
 
-    if (isRollback) {
-      if (saverr == STATERR_NONE && m_saveload_schedule == SLS_SAVE) {
-        if (stateLength != file.size()) {
+    if(isRollback)
+    {
+      if(saverr == STATERR_NONE && m_saveload_schedule == SLS_SAVE)
+      {
+        if(stateLength != file.size())
+        {
           stateLength = file.size();
-          if (statePtr) statePtr = realloc(statePtr,stateLength);
-          else statePtr = malloc(file.size());
+          if(statePtr)
+            statePtr = realloc(statePtr, stateLength);
+          else
+            statePtr = malloc(file.size());
         }
-        file.seek(0,SEEK_SET);
-        file.read(statePtr,file.size());
+        file.seek(0, SEEK_SET);
+        file.read(statePtr, file.size());
         states[onState].first = this->machine_time();
         states[onState].second.clear();
-        states[onState].second.insert(
-          states[onState].second.begin(),
-          (unsigned char*)statePtr,
-          ((unsigned char*)statePtr) + stateLength);
+        states[onState].second.insert(states[onState].second.begin(), (unsigned char *)statePtr,
+                                      ((unsigned char *)statePtr) + stateLength);
 
         vector<unsigned char> &v = states[onState].second;
         emu_file file2(m_saveload_searchpath, OPEN_FLAG_READ);
-        filerr = file2.open_ram(&v[0],v.size());
+        filerr = file2.open_ram(&v[0], v.size());
         save_error saverr2 = m_save.read_file(file2);
-        if (saverr2 != STATERR_NONE) {
+        if(saverr2 != STATERR_NONE)
+        {
           cout << "OOPS: " << saverr2 << endl;
           exit(1);
         }
 
-        onState = (onState+1)%MAX_STATES;
+        onState = (onState + 1) % MAX_STATES;
       }
 
       // Destroy any state saves after this point
-      if (saverr == STATERR_NONE && m_saveload_schedule == SLS_LOAD) {
-        for (int a=0;a<MAX_STATES;a++) {
-          if (states[a].first > this->machine_time()) {
+      if(saverr == STATERR_NONE && m_saveload_schedule == SLS_LOAD)
+      {
+        for(int a = 0; a < MAX_STATES; a++)
+        {
+          if(states[a].first > this->machine_time())
+          {
             cout << "Destroying state at time " << states[a].first << endl;
             states[a].first.seconds = 0;
             states[a].first.attoseconds = 0;
@@ -1372,7 +1413,7 @@ void running_machine::handle_saveload()
 
 
     // close and perhaps delete the file
-    if (saverr != STATERR_NONE && m_saveload_schedule == SLS_SAVE)
+    if(saverr != STATERR_NONE && m_saveload_schedule == SLS_SAVE)
       file.remove_on_close();
   }
   else
@@ -1407,7 +1448,7 @@ void running_machine::soft_reset(void *ptr, INT32 param)
   call_notifiers(MACHINE_NOTIFY_RESET);
 
   // setup autoboot if needed
-  m_autoboot_timer->adjust(attotime(options().autoboot_delay(),0),0);
+  m_autoboot_timer->adjust(attotime(options().autoboot_delay(), 0), 0);
 
   // now we're running
   m_current_phase = MACHINE_PHASE_RUNNING;
@@ -1421,15 +1462,15 @@ void running_machine::soft_reset(void *ptr, INT32 param)
 void running_machine::watchdog_reset()
 {
   // if we're not enabled, skip it
-  if (!m_watchdog_enabled)
+  if(!m_watchdog_enabled)
     m_watchdog_timer->adjust(attotime::never);
 
   // VBLANK-based watchdog?
-  else if (config().m_watchdog_vblank_count != 0)
+  else if(config().m_watchdog_vblank_count != 0)
     m_watchdog_counter = config().m_watchdog_vblank_count;
 
   // timer-based watchdog?
-  else if (config().m_watchdog_time != attotime::zero)
+  else if(config().m_watchdog_time != attotime::zero)
     m_watchdog_timer->adjust(config().m_watchdog_time);
 
   // default to an obscene amount of time (3 seconds)
@@ -1445,7 +1486,7 @@ void running_machine::watchdog_reset()
 void running_machine::watchdog_enable(bool enable)
 {
   // when re-enabled, we reset our state
-  if (m_watchdog_enabled != enable)
+  if(m_watchdog_enabled != enable)
   {
     m_watchdog_enabled = enable;
     watchdog_reset();
@@ -1464,7 +1505,7 @@ void running_machine::watchdog_fired(void *ptr, INT32 param)
 #ifdef MAME_DEBUG
   verbose = true;
 #endif
-  if (verbose)
+  if(verbose)
     popmessage("Reset caused by the watchdog!!!\n");
 
   schedule_soft_reset();
@@ -1479,11 +1520,11 @@ void running_machine::watchdog_fired(void *ptr, INT32 param)
 void running_machine::watchdog_vblank(screen_device &screen, bool vblank_state)
 {
   // VBLANK starting
-  if (vblank_state && m_watchdog_enabled)
+  if(vblank_state && m_watchdog_enabled)
   {
     // check the watchdog
-    if (config().m_watchdog_vblank_count != 0)
-      if (--m_watchdog_counter == 0)
+    if(config().m_watchdog_vblank_count != 0)
+      if(--m_watchdog_counter == 0)
         watchdog_fired();
   }
 }
@@ -1496,7 +1537,7 @@ void running_machine::watchdog_vblank(screen_device &screen, bool vblank_state)
 
 void running_machine::logfile_callback(running_machine &machine, const char *buffer)
 {
-  if (machine.m_logfile != NULL)
+  if(machine.m_logfile != NULL)
     machine.m_logfile->puts(buffer);
 }
 
@@ -1509,19 +1550,19 @@ void running_machine::start_all_devices()
 {
   // iterate through the devices
   int last_failed_starts = -1;
-  while (last_failed_starts != 0)
+  while(last_failed_starts != 0)
   {
     // iterate over all devices
     int failed_starts = 0;
     device_iterator iter(root_device());
-    for (device_t *device = iter.first(); device != NULL; device = iter.next())
-      if (!device->started())
+    for(device_t *device = iter.first(); device != NULL; device = iter.next())
+      if(!device->started())
       {
         // attempt to start the device, catching any expected exceptions
         try
         {
           // if the device doesn't have a machine yet, set it first
-          if (device->m_machine == NULL)
+          if(device->m_machine == NULL)
             device->set_machine(*this);
 
           // now start the device
@@ -1530,7 +1571,7 @@ void running_machine::start_all_devices()
         }
 
         // handle missing dependencies by moving the device to the end
-        catch (device_missing_dependencies &)
+        catch(device_missing_dependencies &)
         {
           // if we're the end, fail
           osd_printf_verbose("  (missing dependencies; rescheduling)\n");
@@ -1540,7 +1581,7 @@ void running_machine::start_all_devices()
 
     // each iteration should reduce the number of failed starts; error if
     // this doesn't happen
-    if (failed_starts == last_failed_starts)
+    if(failed_starts == last_failed_starts)
       throw emu_fatalerror("Circular dependency in device startup!");
     last_failed_starts = failed_starts;
   }
@@ -1567,12 +1608,12 @@ void running_machine::reset_all_devices()
 void running_machine::stop_all_devices()
 {
   // first let the debugger save comments
-  if ((debug_flags & DEBUG_FLAG_ENABLED) != 0)
+  if((debug_flags & DEBUG_FLAG_ENABLED) != 0)
     debug_comment_save(*this);
 
   // iterate over devices and stop them
   device_iterator iter(root_device());
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
     device->stop();
 }
 
@@ -1589,9 +1630,9 @@ void running_machine::presave_all_devices()
 
   device_iterator iter(root_device());
 
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
   {
-    if (device == NULL)
+    if(device == NULL)
     {
       std::cout << "DEVICE IS NULL" << std::endl;
       std::cout.flush();
@@ -1617,7 +1658,7 @@ void running_machine::presave_all_devices()
 void running_machine::postload_all_devices()
 {
   device_iterator iter(root_device());
-  for (device_t *device = iter.first(); device != NULL; device = iter.next())
+  for(device_t *device = iter.first(); device != NULL; device = iter.next())
     device->post_load();
 }
 
@@ -1632,7 +1673,7 @@ const char *running_machine::image_parent_basename(device_t *device)
   while(dev != &root_device())
   {
     device_image_interface *intf = NULL;
-    if (dev!=NULL && dev->interface(intf))
+    if(dev != NULL && dev->interface(intf))
     {
       return intf->basename_noext();
     }
@@ -1650,15 +1691,15 @@ astring &running_machine::nvram_filename(astring &result, device_t &device)
 {
   // start with either basename or basename_biosnum
   result.cpy(basename());
-  if (root_device().system_bios() != 0 && root_device().default_bios() != root_device().system_bios())
+  if(root_device().system_bios() != 0 && root_device().default_bios() != root_device().system_bios())
     result.catprintf("_%d", root_device().system_bios() - 1);
 
   // device-based NVRAM gets its own name in a subdirectory
-  if (&device != &root_device())
+  if(&device != &root_device())
   {
     // add per software nvrams into one folder
     const char *software = image_parent_basename(&device);
-    if (software!=NULL && strlen(software)>0)
+    if(software != NULL && strlen(software) > 0)
     {
       result.cat('\\').cat(software);
     }
@@ -1671,16 +1712,17 @@ astring &running_machine::nvram_filename(astring &result, device_t &device)
 
 extern Common *netCommon;
 
-int nvram_size(running_machine &machine) {
-  int retval=0;
+int nvram_size(running_machine &machine)
+{
+  int retval = 0;
 
   nvram_interface_iterator iter(machine.root_device());
-  
-  for (device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
+
+  for(device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
   {
     astring filename;
     emu_file file(machine.options().nvram_directory(), OPEN_FLAG_READ);
-    if (file.open(machine.nvram_filename(filename, nvram->device())) == FILERR_NONE)
+    if(file.open(machine.nvram_filename(filename, nvram->device())) == FILERR_NONE)
     {
       retval += file.size();
     }
@@ -1696,19 +1738,21 @@ int nvram_size(running_machine &machine) {
 void running_machine::nvram_load()
 {
   int overrideNVram = 0;
-  if(netCommon) {
-    if(nvram_size(*this)>=32*1024*1024) {
-      overrideNVram=1;
+  if(netCommon)
+  {
+    if(nvram_size(*this) >= 32 * 1024 * 1024)
+    {
+      overrideNVram = 1;
       ui().popup_time(3, "The NVRAM for this game is too big, not loading NVRAM.");
     }
   }
 
   nvram_interface_iterator iter(root_device());
-  for (device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
+  for(device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
   {
     astring filename;
     emu_file file(options().nvram_directory(), OPEN_FLAG_READ);
-    if (!overrideNVram && file.open(nvram_filename(filename, nvram->device())) == FILERR_NONE)
+    if(!overrideNVram && file.open(nvram_filename(filename, nvram->device())) == FILERR_NONE)
     {
       nvram->nvram_load(file);
       file.close();
@@ -1724,11 +1768,14 @@ void running_machine::nvram_load()
 
 void running_machine::nvram_save()
 {
-  static bool first=true;
+  static bool first = true;
 
-  if(netCommon) {
-    if(nvram_size(*this)>=32*1024*1024) {
-      if(first) {
+  if(netCommon)
+  {
+    if(nvram_size(*this) >= 32 * 1024 * 1024)
+    {
+      if(first)
+      {
         ui().popup_time(3, "The NVRAM for this game is too big, not saving NVRAM.");
         first = false;
       }
@@ -1738,11 +1785,11 @@ void running_machine::nvram_save()
   }
 
   nvram_interface_iterator iter(root_device());
-  for (device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
+  for(device_nvram_interface *nvram = iter.first(); nvram != NULL; nvram = iter.next())
   {
     astring filename;
     emu_file file(options().nvram_directory(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
-    if (file.open(nvram_filename(filename, nvram->device())) == FILERR_NONE)
+    if(file.open(nvram_filename(filename, nvram->device())) == FILERR_NONE)
     {
       nvram->nvram_save(file);
       file.close();
@@ -1759,8 +1806,7 @@ void running_machine::nvram_save()
 //-------------------------------------------------
 
 running_machine::notifier_callback_item::notifier_callback_item(machine_notify_delegate func)
-  : m_next(NULL),
-    m_func(func)
+: m_next(NULL), m_func(func)
 {
 }
 
@@ -1769,8 +1815,7 @@ running_machine::notifier_callback_item::notifier_callback_item(machine_notify_d
 //-------------------------------------------------
 
 running_machine::logerror_callback_item::logerror_callback_item(logerror_callback func)
-  : m_next(NULL),
-    m_func(func)
+: m_next(NULL), m_func(func)
 {
 }
 
@@ -1805,31 +1850,31 @@ void system_time::set(time_t t)
 
 void system_time::full_time::set(struct tm &t)
 {
-  //JJG: Force clock to 1/1/2000.
+  // JJG: Force clock to 1/1/2000.
   if(netCommon)
   {
-    second  = 0;
-    minute  = 0;
-    hour  = 0;
-    mday  = 0;
+    second = 0;
+    minute = 0;
+    hour = 0;
+    mday = 0;
     month = 0;
-    year  = 2000;
+    year = 2000;
     weekday = 6;
-    day   = 0;
-    is_dst  = 0;
+    day = 0;
+    is_dst = 0;
   }
   else
-{
-  second  = t.tm_sec;
-  minute  = t.tm_min;
-  hour    = t.tm_hour;
-  mday    = t.tm_mday;
-  month   = t.tm_mon;
-  year    = t.tm_year + 1900;
-  weekday = t.tm_wday;
-  day     = t.tm_yday;
-  is_dst  = t.tm_isdst;
-}
+  {
+    second = t.tm_sec;
+    minute = t.tm_min;
+    hour = t.tm_hour;
+    mday = t.tm_mday;
+    month = t.tm_mon;
+    year = t.tm_year + 1900;
+    weekday = t.tm_wday;
+    day = t.tm_yday;
+    is_dst = t.tm_isdst;
+  }
 }
 
 //**************************************************************************
@@ -1838,38 +1883,46 @@ void system_time::full_time::set(struct tm &t)
 
 #ifdef SDLMAME_EMSCRIPTEN
 
-static running_machine * jsmess_machine;
+static running_machine *jsmess_machine;
 
-void js_main_loop() {
-  try {
+void js_main_loop()
+{
+  try
+  {
     jsmess_machine->emscripten_main_loop();
-  } catch (const std::exception &exc) {
+  }
+  catch(const std::exception &exc)
+  {
     std::cerr << exc.what();
     std::cerr.flush();
-  } catch (...) {
+  }
+  catch(...)
+  {
     std::cerr << "unknown exception";
     std::cerr.flush();
   }
 }
 
-void js_set_main_loop(running_machine * machine) {
+void js_set_main_loop(running_machine *machine)
+{
   jsmess_machine = machine;
-  EM_ASM (
-    JSMESS.running = true;
-  );
+  EM_ASM(JSMESS.running = true;);
 
   emscripten_set_main_loop(&js_main_loop, 0, 1);
 }
 
-running_machine * js_get_machine() {
+running_machine *js_get_machine()
+{
   return jsmess_machine;
 }
 
-ui_manager * js_get_ui() {
+ui_manager *js_get_ui()
+{
   return &(jsmess_machine->ui());
 }
 
-sound_manager * js_get_sound() {
+sound_manager *js_get_sound()
+{
   return &(jsmess_machine->sound());
 }
 

@@ -23,10 +23,9 @@
 #include "ui/ui.h"
 #include "unicode.h"
 
-using boost::shared_ptr;
+using std::shared_ptr;
 
 using namespace std;
-using namespace boost;
 using namespace nsm;
 using namespace google::protobuf::io;
 
@@ -180,6 +179,7 @@ Server::Server(string guid, int _unmeasuredNoise, bool _rollback)
   syncReady = false;
   syncCount = 0;
   selfPeerID = 1;
+  nextPeerID = 2;
   
   upsertPeer(guid, 1, newAttotime(1, 0));
 }
@@ -193,59 +193,28 @@ void Server::shutdown() {
 
 extern RakNet::Time emulationStartTime;
 
-void Server::acceptPeer(const std::string& guidToAccept,
+void Server::acceptPeer(const std::string& guid,
                         running_machine *machine) {
-  cout << "ACCEPTED PEER " << guidToAccept << endl;
+  cout << "ACCEPTED PEER " << guid << endl;
   
-  int assignID = -1;
+  int peerID = -1;
   for (std::unordered_map<std::string, int>::iterator it = deadPeerIDs.begin();
        it != deadPeerIDs.end(); it++) {
-    if (it->first == guidToAccept) {
-      assignID = it->second;
+    if (it->first == guid) {
+      peerID = it->second;
+      deadPeerIDs.erase(it);
+      break;
     }
   }
 
-  int lastUsedPeerID = 1;
-  if (assignID == -1) {
-    bool usingNextPeerID = true;
-    while (usingNextPeerID) {
-      // Peer ID's are 1-based between 1 and maxPeerID inclusive, with 1 being
-      // reserved for the server
-      lastUsedPeerID = (lastUsedPeerID + 1) % (maxPeerID + 1);
-      if (!lastUsedPeerID)
-        lastUsedPeerID = 2;
-      usingNextPeerID = false;
-
-      for (std::unordered_map<std::string, int>::iterator it = peerIDs.begin();
-           it != peerIDs.end(); it++) {
-        if (it->second == lastUsedPeerID) {
-          usingNextPeerID = true;
-          break;
-        }
-      }
-      if (!usingNextPeerID) {
-        // We took a dead person's ID, delete their history
-        for (std::unordered_map<std::string, int>::iterator it =
-                 deadPeerIDs.begin();
-             it != deadPeerIDs.end();) {
-          if (it->second == lastUsedPeerID) {
-            std::unordered_map<std::string, int>::iterator itold = it;
-            it++;
-            deadPeerIDs.erase(itold);
-          } else {
-            it++;
-          }
-        }
-      }
-    }
-
-    assignID = lastUsedPeerID;
+  if (peerID == -1) {
+    peerID = nextPeerID++;
   }
 
-  printf("ASSIGNING ID %d TO NEW CLIENT\n", assignID);
+  printf("ASSIGNING ID %d TO NEW CLIENT\n", peerID);
 
   nsm::Attotime at = newAttotime(machine->machine_time().seconds, machine->machine_time().attoseconds);
-  upsertPeer(guidToAccept, assignID, at);
+  upsertPeer(guid, peerID, at);
 
   {
     char buf[32];
@@ -259,7 +228,7 @@ void Server::acceptPeer(const std::string& guidToAccept,
     // 4 bytes - elapsed time
     
     char* tmpbuf = buf + 1;
-    memcpy(tmpbuf, &assignID, sizeof(int));
+    memcpy(tmpbuf, &peerID, sizeof(int));
     tmpbuf += sizeof(int);
 
     int secs = at.seconds();
@@ -276,7 +245,7 @@ void Server::acceptPeer(const std::string& guidToAccept,
     memcpy(tmpbuf, &t, sizeof(RakNet::Time));
     tmpbuf += sizeof(RakNet::Time);
 
-    rakInterface->Send(buf, int(tmpbuf - buf), guidToAccept);
+    rakInterface->Send(buf, int(tmpbuf - buf), guid);
   }
 
   // TODO FIX ME
@@ -292,7 +261,7 @@ void Server::acceptPeer(const std::string& guidToAccept,
   }*/
 
   // Perform initial sync with player
-  initialSync(guidToAccept, machine);
+  // initialSync(guid, machine);
 }
 
 void Server::removePeer(const std::string& guid, running_machine *machine) {
@@ -303,20 +272,20 @@ void Server::removePeer(const std::string& guid, running_machine *machine) {
   cout << "REMOVING PEER\n";
 }
 
-vector<boost::shared_ptr<MemoryBlock> >
+vector<std::shared_ptr<MemoryBlock> >
 Server::createMemoryBlock(const std::string &name, unsigned char *ptr,
                           int size) {
-  vector<boost::shared_ptr<MemoryBlock> > retval;
+  vector<std::shared_ptr<MemoryBlock> > retval;
   const int BYTES_IN_MB = 1024 * 1024;
   if (size > BYTES_IN_MB) {
     for (int a = 0;; a += BYTES_IN_MB) {
       if (a + BYTES_IN_MB >= size) {
-        vector<boost::shared_ptr<MemoryBlock> > tmp =
+        vector<std::shared_ptr<MemoryBlock> > tmp =
             createMemoryBlock(name, ptr + a, size - a);
         retval.insert(retval.end(), tmp.begin(), tmp.end());
         break;
       } else {
-        vector<boost::shared_ptr<MemoryBlock> > tmp =
+        vector<std::shared_ptr<MemoryBlock> > tmp =
             createMemoryBlock(name, ptr + a, BYTES_IN_MB);
         retval.insert(retval.end(), tmp.begin(), tmp.end());
       }
@@ -325,11 +294,11 @@ Server::createMemoryBlock(const std::string &name, unsigned char *ptr,
   }
   // printf("Creating memory block at %X with size %d\n",ptr,size);
   blocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
   staleBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
   initialBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
   retval.push_back(blocks.back());
   return retval;
 }
@@ -350,7 +319,7 @@ void Server::initialSync(const std::string& guid,
   global_time->set_seconds(staleTime.seconds());
   global_time->set_attoseconds(staleTime.attoseconds());
 
-  if (getSecondsBetweenSync()) {
+  /*if (getSecondsBetweenSync()) {
     cout << "IN CRITICAL SECTION\n";
     cout << "SERVER: Sending initial snapshot\n";
 
@@ -373,12 +342,13 @@ void Server::initialSync(const std::string& guid,
       initial_sync.add_checksum(checksum);
     }
     cout << "CHECKSUM: " << int(checksum) << endl;
-  }
+  }*/
 
   // waitingForClientCatchup = true;
   // machine->osd().pauseAudio(true);
 
-  for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
+  
+  /*for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
        it++) {
     nsm::PeerInputDataList *peer_data = initial_sync.add_peer_data();
     peer_data->set_peer_id(it->first);
@@ -398,17 +368,20 @@ void Server::initialSync(const std::string& guid,
       nsm::PeerInputData *input_data = peer_data->add_input_data();
       input_data->CopyFrom(it2->second);
     }
-  }
+  }*/
 
-  bool writenvram = (nvram_size(*machine) < 1024 * 1024 * 32);
+  /*bool writenvram = (nvram_size(*machine) < 1024 * 1024 * 32);
   if (writenvram) {
     nvram_interface_iterator iter(machine->root_device());
     for (device_nvram_interface *nvram = iter.first(); nvram != NULL;
          nvram = iter.next()) {
       astring filename;
       emu_file file(machine->options().nvram_directory(), OPEN_FLAG_READ);
-      if (file.open(machine->nvram_filename(filename, nvram->device())) ==
-          FILERR_NONE) {
+      machine->nvram_filename(filename, nvram->device());
+      std::cout << "WRITING NVRAM FOR DEVICE " << filename.cstr() << std::endl;
+      std::cout.flush();
+
+      if (file.open(filename) == FILERR_NONE) {
         vector<unsigned char> fileContents(file.size());
         file.read(&fileContents[0], file.size());
         initial_sync.add_nvram(&fileContents[0], file.size());
@@ -420,7 +393,7 @@ void Server::initialSync(const std::string& guid,
         cout << "FAILED TO WRITE NVRAM" << endl;
       }
     }
-  }
+  }*/
 
   string s;
   {

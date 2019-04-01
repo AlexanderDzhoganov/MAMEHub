@@ -14,7 +14,7 @@ class Server : public Common {
   bool syncOverride;
 
   protected:
-  std::vector<boost::shared_ptr<MemoryBlock> > initialBlocks;
+  std::vector<std::shared_ptr<MemoryBlock> > initialBlocks;
   nsm::Attotime staleTime;
   int staleGeneration;
 
@@ -23,6 +23,7 @@ class Server : public Common {
   bool syncReady;
   bool blockNewClients;
   int maxPeerID;
+  int nextPeerID;
   nsm::Sync syncProto;
 
   std::list<std::pair<unsigned char *, int> > syncPacketQueue;
@@ -40,7 +41,7 @@ class Server : public Common {
 
   void removePeer(const std::string& guid, running_machine *machine);
 
-  std::vector<boost::shared_ptr<MemoryBlock> >
+  std::vector<std::shared_ptr<MemoryBlock> >
   createMemoryBlock(const std::string &name, unsigned char *ptr, int size);
 
   void initialSync(const std::string& guid, running_machine *machine);

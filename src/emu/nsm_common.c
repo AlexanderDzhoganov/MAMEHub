@@ -13,7 +13,6 @@
 #include "osdcore.h"
 
 using namespace std;
-using namespace boost;
 using namespace nsm;
 
 Common *netCommon = NULL;
@@ -413,7 +412,7 @@ nsm::Attotime Common::getStartTime(int peerID) {
 */
 
 template <class T>
-void addLocations(const vector<boost::shared_ptr<MemoryBlock> > &blocks,
+void addLocations(const vector<std::shared_ptr<MemoryBlock> > &blocks,
                   unsigned int value,
                   const set<BlockValueLocation> &locationsToIntersect,
                   vector<BlockValueLocation> &newLocations,

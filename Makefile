@@ -500,10 +500,7 @@ CPPONLYFLAGS =
 # (remember, expansion only happens when used, so doing it here is ok)
 CFLAGS = $(CCOMFLAGS) $(CPPONLYFLAGS) $(INCPATH)
 
-# we compile C-only to C89 standard with GNU extensions
-# we compile C++ code to C++98 standard with GNU extensions
-
-EMFLAGS = -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1 -s EMULATE_FUNCTION_POINTER_CASTS=1
+EMFLAGS = -s USE_PTHREADS=0 -s USE_SDL_TTF=2 -s USE_ZLIB=1
 EMFLAGS += -Wfatal-errors -Wno-macro-redefined -Wno-expansion-to-defined -Wno-unused-local-typedef -Wno-enum-compare-switch
 EMFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-deprecated-register -Wno-c++11-narrowing
 
@@ -512,7 +509,7 @@ EMFLAGS += -g
 endif
 
 CONLYFLAGS += $(EMFLAGS)
-CPPONLYFLAGS += -x c++ -std=gnu++98 $(EMFLAGS)
+CPPONLYFLAGS += -x c++ -std=c++11 $(EMFLAGS)
 COBJFLAGS += -x objective-c++
 
 # this speeds it up a bit by piping between the preprocessor/compiler/assembler
@@ -617,7 +614,7 @@ INCPATH += \
 	-I$(SRC)/lib/util \
 	-I$(SRC)/lib \
 	-I$(3RDPARTY) \
-	-I$(3RDPARTY)/boost_thread \
+	-I$(3RDPARTY)/boost \
 	-I$(3RDPARTY)/protobuf \
 	-I$(SRC)/osd \
 	-I$(SRC)/osd/$(OSD) \

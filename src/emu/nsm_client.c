@@ -25,7 +25,6 @@
 #include "unicode.h"
 
 using namespace std;
-using namespace boost;
 using namespace nsm;
 using namespace google::protobuf::io;
 
@@ -70,24 +69,24 @@ void Client::shutdown() {
   RakNet::RakPeerInterface::DestroyInstance(rakInterface);
 }
 
-vector<boost::shared_ptr<MemoryBlock> >
+vector<std::shared_ptr<MemoryBlock> >
 Client::createMemoryBlock(const std::string &name, unsigned char *ptr,
                           int size) {
   if (initComplete) {
     cout << "ERROR: CREATED MEMORY BLOCK TOO LATE\n";
     exit(1);
   }
-  vector<boost::shared_ptr<MemoryBlock> > retval;
+  vector<std::shared_ptr<MemoryBlock> > retval;
   const int BYTES_IN_MB = 1024 * 1024;
   if (size > BYTES_IN_MB) {
     for (int a = 0;; a += BYTES_IN_MB) {
       if (a + BYTES_IN_MB >= size) {
-        vector<boost::shared_ptr<MemoryBlock> > tmp =
+        vector<std::shared_ptr<MemoryBlock> > tmp =
             createMemoryBlock(name, ptr + a, size - a);
         retval.insert(retval.end(), tmp.begin(), tmp.end());
         break;
       } else {
-        vector<boost::shared_ptr<MemoryBlock> > tmp =
+        vector<std::shared_ptr<MemoryBlock> > tmp =
             createMemoryBlock(name, ptr + a, BYTES_IN_MB);
         retval.insert(retval.end(), tmp.begin(), tmp.end());
       }
@@ -96,11 +95,11 @@ Client::createMemoryBlock(const std::string &name, unsigned char *ptr,
   }
   // printf("Creating memory block at %X with size %d\n",ptr,size);
   blocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
   staleBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
   syncCheckBlocks.push_back(
-      boost::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
   retval.push_back(blocks.back());
   return retval;
 }
@@ -440,8 +439,8 @@ bool Client::update(running_machine *machine) {
       nsm::Attotime startTime = newAttotime(secs, attosecs);
 
       cout << "HOST ACCEPTED, SELF PEER ID = " << selfPeerID << endl;
+      player = selfPeerID - 1;
 
-      // This is me, set my own ID and name
       mostRecentSentReport.seconds = startTime.seconds();
       mostRecentSentReport.attoseconds = startTime.attoseconds();
       cout << "CLIENT STARTED AT TIME: " << startTime.seconds() << "."
