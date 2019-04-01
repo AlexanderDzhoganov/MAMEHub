@@ -188,7 +188,10 @@ void save_manager::save_memory(device_t *device, const char *module, const char 
 	// insert us into the list
 	m_entry_list.insert_after(*global_alloc(state_entry(val, totalname, device, module, tag ? tag : "", index, valsize, valcount)), insert_after);
 
-	if(netCommon) netCommon->createMemoryBlock(std::string(totalname.cstr()), (unsigned char*)val,valsize*valcount);
+	if(netCommon)
+	{
+		netCommon->createMemoryBlock(std::string(totalname.cstr()), (unsigned char*)val, valsize * valcount);
+	}
 }
 
 

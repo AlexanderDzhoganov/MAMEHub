@@ -264,7 +264,7 @@ int Common::getLargestPing(int currentSecond) {
   return largestPing;
   */
 
-  return 0;
+  return 10; // TODO FIXME
 }
 
 bool Common::hasPeerWithID(int peerID) {

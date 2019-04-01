@@ -292,13 +292,15 @@ Server::createMemoryBlock(const std::string &name, unsigned char *ptr,
     }
     return retval;
   }
-  // printf("Creating memory block at %X with size %d\n",ptr,size);
+  
+  std::cout << "Creating memory block " << name << " at " << (unsigned int)ptr << "with size " << size << std::endl;
+
   blocks.push_back(
       std::shared_ptr<MemoryBlock>(new MemoryBlock(name, ptr, size)));
   staleBlocks.push_back(
-      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
   initialBlocks.push_back(
-      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size))); // TODO FIXME, empty?
+      std::shared_ptr<MemoryBlock>(new MemoryBlock(name, size)));
   retval.push_back(blocks.back());
   return retval;
 }
@@ -319,7 +321,7 @@ void Server::initialSync(const std::string& guid,
   global_time->set_seconds(staleTime.seconds());
   global_time->set_attoseconds(staleTime.attoseconds());
 
-  /*if (getSecondsBetweenSync()) {
+  if (getSecondsBetweenSync()) {
     cout << "IN CRITICAL SECTION\n";
     cout << "SERVER: Sending initial snapshot\n";
 
@@ -342,13 +344,12 @@ void Server::initialSync(const std::string& guid,
       initial_sync.add_checksum(checksum);
     }
     cout << "CHECKSUM: " << int(checksum) << endl;
-  }*/
+  }
 
   // waitingForClientCatchup = true;
   // machine->osd().pauseAudio(true);
-
   
-  /*for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
+  for (unordered_map<int, PeerData>::iterator it = peerData.begin(); it != peerData.end();
        it++) {
     nsm::PeerInputDataList *peer_data = initial_sync.add_peer_data();
     peer_data->set_peer_id(it->first);
@@ -368,9 +369,9 @@ void Server::initialSync(const std::string& guid,
       nsm::PeerInputData *input_data = peer_data->add_input_data();
       input_data->CopyFrom(it2->second);
     }
-  }*/
+  }
 
-  /*bool writenvram = (nvram_size(*machine) < 1024 * 1024 * 32);
+  bool writenvram = (nvram_size(*machine) < 1024 * 1024 * 32);
   if (writenvram) {
     nvram_interface_iterator iter(machine->root_device());
     for (device_nvram_interface *nvram = iter.first(); nvram != NULL;
@@ -393,7 +394,7 @@ void Server::initialSync(const std::string& guid,
         cout << "FAILED TO WRITE NVRAM" << endl;
       }
     }
-  }*/
+  }
 
   string s;
   {
@@ -431,8 +432,6 @@ void Server::initialSync(const std::string& guid,
   }
 
   cout << "FINISHED SENDING BLOCKS TO CLIENT\n";
-  cout << "SERVER: Done with initial snapshot\n";
-  cout << "OUT OF CRITICAL AREA\n";
   cout.flush();
 }
 
@@ -444,10 +443,12 @@ nsm::PeerInputData Server::popInput(int peerID) {
     }
     blockNewClients = true;
   }
+  
   return inputToPop;
 }
 
 bool Server::update(running_machine *machine) {
+  return true;
   // cout << "SERVER TIME: " << RakNet::GetTimeMS()/1000.0f/60.0f << endl;
   // printf("Updating server\n");
 

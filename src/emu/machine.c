@@ -335,138 +335,50 @@ extern circular_buffer<std::pair<attotime, InputState>> playerInputData[MAX_PLAY
 
 void running_machine::processNetworkBuffer(PeerInputData *inputData, int peerID)
 {
-  if(inputData == NULL)
+  if(inputData == NULL || inputData->inputtype() != PeerInputData::INPUT)
   {
     return;
   }
 
-  if(inputData->inputtype() == PeerInputData::INPUT)
-  {
     // printf("GOT INPUT\n");
-    attotime tmptime(inputData->time().seconds(), inputData->time().attoseconds());
+  attotime tmptime(inputData->time().seconds(), inputData->time().attoseconds());
 
-    for(int a = 0; a < inputData->inputstate().players_size(); a++)
+  for(int a = 0; a < inputData->inputstate().players_size(); a++)
+  {
+    // int player = inputData->inputstate().players(a);
+    // cout << "Peer " << peerID << " has input for player " << inputData->inputstate().players(a) << " at time " << tmptime.seconds << "." << tmptime.attoseconds << endl;
+    circular_buffer<pair<attotime, InputState>> &onePlayerInputData =
+    playerInputData[inputData->inputstate().players(a)];
+    if(onePlayerInputData.empty())
     {
-      // int player = inputData->inputstate().players(a);
-      // cout << "Peer " << peerID << " has input for player " << inputData->inputstate().players(a) << " at time " << tmptime.seconds << "." << tmptime.attoseconds << endl;
-      circular_buffer<pair<attotime, InputState>> &onePlayerInputData =
-      playerInputData[inputData->inputstate().players(a)];
-      if(onePlayerInputData.empty())
+      onePlayerInputData.insert(onePlayerInputData.begin(),
+                                pair<attotime, InputState>(tmptime, inputData->inputstate()));
+    }
+    else
+    {
+      for(circular_buffer<pair<attotime, InputState>>::reverse_iterator it = onePlayerInputData.rbegin();
+          it != onePlayerInputData.rend(); it++)
       {
-        onePlayerInputData.insert(onePlayerInputData.begin(),
-                                  pair<attotime, InputState>(tmptime, inputData->inputstate()));
-      }
-      else
-      {
-        // TODO: Re-think this and clean it up
-        if(netCommon->isRollback())
+        // cout << "IN INPUT LOOP\n";
+        if(it->first < tmptime)
         {
-          circular_buffer<pair<attotime, InputState>>::reverse_iterator it = onePlayerInputData.rbegin();
-          attotime lastInputTime = it->first;
-          if(lastInputTime == tmptime)
-          {
-            return;
-          }
-          if(lastInputTime > tmptime)
-          {
-            cout << "unexpected time " << lastInputTime << " " << tmptime << "\n";
-            exit(1);
-          }
-
-          // Check if the input states are equal.
-          std::string s1string;
-          std::string s2string;
-          // cout << "First serialize\n";
-          ::nsm::InputState s1 = inputData->inputstate();
-          ::nsm::InputState s2 = it->second;
-          s1.set_framecount(0);
-          s2.set_framecount(0);
-          s1.SerializeToString(&s1string);
-          // cout << "Second serialize\n";
-          s2.SerializeToString(&s2string);
-          if(s1string != s2string)
-          {
-            attotime currentMachineTime = machine_time();
-            if(currentMachineTime > tmptime)
-            {
-              if(doRollback)
-              {
-                if(rollbackTime > tmptime)
-                {
-                  // Roll back further
-                  rollbackTime = tmptime;
-                  cout << "Rolling back further from " << currentMachineTime << " to " << tmptime << endl;
-                }
-              }
-              else
-              {
-                // Roll back
-                cout << "Rolling back from " << currentMachineTime << " to " << tmptime << endl;
-                rollbackTime = tmptime;
-                doRollback = true;
-              }
-            }
-          }
-
-          onePlayerInputData.push_back(make_pair(tmptime, inputData->inputstate()));
+          onePlayerInputData.insert(it.base(), // NOTE: base() returns the iterator 1 position in the past
+                                    pair<attotime, InputState>(tmptime, inputData->inputstate()));
+          break;
         }
-        else
-        { // no rollback
-          for(circular_buffer<pair<attotime, InputState>>::reverse_iterator it = onePlayerInputData.rbegin();
-              it != onePlayerInputData.rend(); it++)
-          {
-            // cout << "IN INPUT LOOP\n";
-            if(it->first < tmptime)
-            {
-              onePlayerInputData.insert(it.base(), // NOTE: base() returns the iterator 1 position in the past
-                                        pair<attotime, InputState>(tmptime, inputData->inputstate()));
-              break;
-            }
-            else if(it->first == tmptime)
-            {
-              // TODO: If two peers send inputs at the same time for the same player, break ties with peer id.
-              break;
-            }
-            else if(it == onePlayerInputData.rend())
-            {
-              onePlayerInputData.insert(onePlayerInputData.begin(),
-                                        pair<attotime, InputState>(tmptime, inputData->inputstate()));
-              break;
-            }
-          }
+        else if(it->first == tmptime)
+        {
+          // TODO: If two peers send inputs at the same time for the same player, break ties with peer id.
+          break;
+        }
+        else if(it == onePlayerInputData.rend())
+        {
+          onePlayerInputData.insert(onePlayerInputData.begin(),
+                                    pair<attotime, InputState>(tmptime, inputData->inputstate()));
+          break;
         }
       }
     }
-  }
-  else if(inputData->inputtype() == PeerInputData::CHAT)
-  {
-    string buffer = inputData->inputbuffer();
-    cout << "GOT CHAT " << buffer << endl;
-    char buf[4096];
-    sprintf(buf, "%s: %s", netCommon->getPeerNameFromID(peerID).c_str(), buffer.c_str());
-    astring chatAString = astring(buf);
-    // Figure out the index of who spoke and send that
-    chatLogs.push_back(ChatLog(peerID, ::time(NULL), chatAString));
-  }
-  else if(inputData->inputtype() == PeerInputData::FORCE_VALUE)
-  {
-    const string &buffer = inputData->inputbuffer();
-    cout << "FORCING VALUE\n";
-    int blockIndex, memoryStart, memorySize, value;
-    unsigned char ramRegion, memoryMask;
-    memcpy(&ramRegion, &buffer[0] + 1, sizeof(int));
-    memcpy(&blockIndex, &buffer[0] + 2, sizeof(int));
-    memcpy(&memoryStart, &buffer[0] + 6, sizeof(int));
-    memcpy(&memorySize, &buffer[0] + 10, sizeof(int));
-    memcpy(&memoryMask, &buffer[0] + 14, sizeof(unsigned char));
-    memcpy(&value, &buffer[0] + 15, sizeof(int));
-    // New force
-    netCommon->forceLocation(BlockValueLocation(ramRegion, blockIndex, memoryStart, memorySize, memoryMask), value);
-    ui().popup_time(3, "Server created new cheat");
-  }
-  else
-  {
-    printf("UNKNOWN INPUT BUFFER PACKET!!!\n");
   }
 }
 
@@ -528,39 +440,41 @@ void running_machine::emscripten_main_loop()
   bool secondPassed = false;
   bool tenthSecondPassed = false;
 
-  if(timePassed)
+  if(!timePassed)
   {
-    // cout << "TIME MOVED FROM " << timeBefore << " TO " << timeAfter << endl;
-    m_machine_time += (timeAfter - timeBefore);
-    attotime machineTimeAfter = machine_time();
-    secondPassed = machineTimeBefore.seconds != machineTimeAfter.seconds;
-    tenthSecondPassed =
-    secondPassed || ((machineTimeBefore.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)) !=
-                     (machineTimeAfter.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)));
+    return;
+  }
 
-    if(netCommon)
+  // cout << "TIME MOVED FROM " << timeBefore << " TO " << timeAfter << endl;
+  m_machine_time += (timeAfter - timeBefore);
+  attotime machineTimeAfter = machine_time();
+  secondPassed = machineTimeBefore.seconds != machineTimeAfter.seconds;
+  tenthSecondPassed =
+  secondPassed || ((machineTimeBefore.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)) !=
+                    (machineTimeAfter.attoseconds / (ATTOSECONDS_PER_SECOND / 10ULL)));
+
+  if(netCommon)
+  {
+    // Process any remaining packets.
+    if(!netCommon->update(this))
     {
-      // Process any remaining packets.
-      if(!netCommon->update(this))
-      {
-        cout << "NETWORK FAILED\n";
-        ::exit(1);
-      }
+      cout << "NETWORK FAILED\n";
+      exit(1);
+    }
 
-      netCommon->getPeerIDs(peerIDs);
+    netCommon->getPeerIDs(peerIDs);
 
-      for(int a = 0; a < peerIDs.size(); a++)
+    for(int a = 0; a < peerIDs.size(); a++)
+    {
+      while(true)
       {
-        while(true)
+        nsm::PeerInputData input = netCommon->popInput(peerIDs[a]);
+        if(!input.has_time())
         {
-          nsm::PeerInputData input = netCommon->popInput(peerIDs[a]);
-          if(!input.has_time())
-          {
-            break;
-          }
-
-          processNetworkBuffer(&input, peerIDs[a]);
+          break;
         }
+
+        processNetworkBuffer(&input, peerIDs[a]);
       }
     }
   }
@@ -569,39 +483,33 @@ void running_machine::emscripten_main_loop()
   static int lastSyncSecond = 0;
   static int firstTimeAtSecond = 0;
 
-  if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed && !firstTimeAtSecond)
+  if(m_machine_time.seconds > 0 && m_scheduler.can_save() && !firstTimeAtSecond)
   {
     firstTimeAtSecond = 1;
+
     if(netServer)
     {
       // Initial sync
       netServer->sync(this);
-
-      // netServer->acceptPeer("test", this); // TODO FIXME this causes a crash
       // nvram_save(); // TODO FIXME necessary?
     }
 
     if(netClient)
     {
-      if(!netClient->initializeConnection(this))
-      {
-        exit(MAMERR_NETWORK);
-      }
+      netClient->initializeConnection(this);
 
       printf("LOADED CLIENT\n");
       cout << "RAND/TIME AT INITIAL SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
-
-      // Load initial data
-      // netClient->createInitialBlocks(this); // TODO FIXME, why was this called here?
     }
   }
-  else if(m_machine_time.seconds > 0 && m_scheduler.can_save() && timePassed)
+  else if(m_machine_time.seconds > 0 && m_scheduler.can_save())
   {
     if(netServer && lastSyncSecond != m_machine_time.seconds && netServer->getSecondsBetweenSync() > 0 &&
-       !netCommon->isRollback() && (m_machine_time.seconds % netServer->getSecondsBetweenSync()) == 0)
+      (m_machine_time.seconds % netServer->getSecondsBetweenSync()) == 0)
     {
       lastSyncSecond = m_machine_time.seconds;
       printf("SERVER SYNC AT TIME: %d\n", int(::time(NULL)));
+      
       if(!m_scheduler.can_save())
       {
         printf("ANONYMOUS TIMER! COULD NOT DO FULL SYNC\n");
@@ -615,8 +523,8 @@ void running_machine::emscripten_main_loop()
       }
     }
 
-    if(netClient && netClient->initComplete && lastSyncSecond != m_machine_time.seconds &&
-       netClient->getSecondsBetweenSync() > 0 && !netCommon->isRollback() &&
+    if(netClient && lastSyncSecond != m_machine_time.seconds &&
+       netClient->getSecondsBetweenSync() > 0 &&
        (m_machine_time.seconds % netClient->getSecondsBetweenSync()) == 0)
     {
       lastSyncSecond = m_machine_time.seconds;
@@ -636,95 +544,42 @@ void running_machine::emscripten_main_loop()
     }
 
     static clock_t lastSyncTime = clock();
-    if(netCommon)
+    lastSyncTime = clock();
+
+    if(netServer)
     {
-      lastSyncTime = clock();
+      netServer->update(this);
+    }
 
-      // TODO: Fix forces
-      // netCommon->updateForces(getRawMemoryRegions());
-
-      if(netServer)
+    if(netClient)
+    {
+      if(!netClient->update(this))
       {
-        netServer->update(this);
+        m_exit_pending = true;
+        return;
       }
 
-      if(netClient && netClient->initComplete)
+      // Don't try to resync on the same frame that you created the sync check.
+      if(lastSyncSecond != m_machine_time.seconds)
       {
-        if(!netClient->update(this))
+        if(netClient->sync(this))
         {
-          m_exit_pending = true;
-          return;
-        }
-
-        // Don't try to resync on the same frame that you created the sync check.
-        if(lastSyncSecond != m_machine_time.seconds)
-        {
-          if(netClient->sync(this))
+          if(!m_scheduler.can_save())
           {
-            if(!m_scheduler.can_save())
-            {
-              printf("ANONYMOUS TIMER! THIS COULD BE BAD (BUT HOPEFULLY ISN'T)\n");
-            }
-
-            cout << "GOT SYNC FROM SERVER\n";
-            cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
+            printf("ANONYMOUS TIMER! THIS COULD BE BAD (BUT HOPEFULLY ISN'T)\n");
           }
+
+          cout << "GOT SYNC FROM SERVER\n";
+          cout << "RAND/TIME AT SYNC: " << m_rand_seed << ' ' << m_base_time << endl;
         }
       }
     }
   }
 
   // handle save/load
-  if(timePassed && m_saveload_schedule != SLS_NONE)
+  if(m_saveload_schedule != SLS_NONE)
   {
     handle_saveload();
-  }
-  else if(timePassed && netCommon && netCommon->isRollback())
-  {
-    if(trackFrameNumber > 0 && m_scheduler.can_save() && trackFrameNumber != inputFrameNumber)
-    {
-      isRollback = true;
-      immediate_save("test");
-      cout << "SAVING AT TIME " << m_machine_time << endl;
-      isRollback = false;
-      trackFrameNumber = 0;
-    }
-
-    if(m_machine_time.seconds > 0 && m_scheduler.can_save() && tenthSecondPassed)
-    {
-      cout << "Tenth second passed: " << m_machine_time << endl;
-      if(secondPassed)
-      {
-        cout << "Second passed" << endl;
-      }
-      trackFrameNumber = inputFrameNumber;
-
-      /*
-      static int biggestSecond=0;
-      if (time().seconds > biggestSecond) {
-        biggestSecond = time().seconds;
-        if (biggestSecond>10) {
-          cout << "Rolling back" << endl;
-          isRollback = true;
-          immediate_load("test");
-          isRollback = false;
-          catchingUp = true;
-        }
-      }
-      */
-    }
-
-    if(m_machine_time.seconds > 0 && m_scheduler.can_save())
-    {
-      if(doRollback)
-      {
-        doRollback = false;
-        isRollback = true;
-        immediate_load("test");
-        isRollback = false;
-        catchingUp = true;
-      }
-    }
   }
 }
 
@@ -1906,6 +1761,7 @@ void js_main_loop()
 void js_set_main_loop(running_machine *machine)
 {
   jsmess_machine = machine;
+  
   EM_ASM(JSMESS.running = true;);
 
   emscripten_set_main_loop(&js_main_loop, 0, 1);

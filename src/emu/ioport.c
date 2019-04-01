@@ -3195,8 +3195,6 @@ void ioport_manager::frame_update()
     }
   }
 
-  return; // TODO FIXME
-
   vector<nsm::InputState*> remoteInputStates;
 
   if(curMachineTime >= inputStartTime && netCommon) {

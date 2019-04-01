@@ -149,6 +149,7 @@ extern bool waitingForClientCatchup;
 extern int baseDelayFromPing;
 extern attotime mostRecentSentReport;
 RakNet::Time largestPacketTime = 0;
+extern bool catchingUp;
 
 bool Client::initializeConnection(running_machine *machine) {
   char buf[1];
@@ -156,6 +157,7 @@ bool Client::initializeConnection(running_machine *machine) {
   rakInterface->Send(buf, 1);
   machine->osd().pauseAudio(true);
   syncing = true;
+  catchingUp = true;
   return true;
 
   // peerIDs[guid] = 1;

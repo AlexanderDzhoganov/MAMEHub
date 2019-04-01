@@ -217,6 +217,7 @@ int machine_manager::execute()
     else if(m_options.server())
     {
       createGlobalServer(m_options.username(), m_options.baseDelay(), m_options.rollback());
+      netServer->setSecondsBetweenSync(m_options.secondsBetweenSync());
       netServer->setSyncTransferTime(m_options.syncTransferSeconds());
     }
 
